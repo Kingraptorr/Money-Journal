@@ -1,0 +1,65 @@
+import WebApp from "@twa-dev/sdk";
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
+
+let sessionToken = null;
+
+export async function authenticate() {
+  if (sessionToken) return sessionToken;
+  const initData = WebApp.initData || window.Telegram?.WebApp?.initData || "";
+
+  if (!initData) {
+    throw new Error("telegram_init_data_missing");
+  }
+
+  const response = await fetch(`${API_BASE_URL}/api/auth/telegram`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ initData }),
+  });
+
+  if (!response.ok) throw new Error("auth_failed");
+  const data = await response.json();
+  sessionToken = data.token;
+  return sessionToken;
+}
+
+async function api(path, options = {}) {
+  const token = await authenticate();
+
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...options,
+    headers: {
+      ...(options.headers ?? {}),
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) throw new Error("api_error");
+  return response.json();
+}
+
+export function getSummary(month) {
+  return api(`/api/expenses/summary?month=${month}`, { fallback: { total: 0 } });
+}
+
+export function getChart(month) {
+  return api(`/api/expenses/chart?month=${month}`, { fallback: { data: [] } });
+}
+
+export function getHistory(month, category) {
+  const categoryQuery = category ? `&category=${category}` : "";
+  return api(`/api/expenses/history?month=${month}${categoryQuery}`, { fallback: { expenses: [] } });
+}
+
+export function deleteExpense(id) {
+  return api(`/api/expenses/${id}`, { method: "DELETE" });
+}
+
+export function updateExpense(id, expense) {
+  return api(`/api/expenses/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(expense),
+  });
+}

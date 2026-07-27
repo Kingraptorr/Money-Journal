@@ -1,0 +1,17 @@
+[Unit]
+Description=AI Money Journal Telegram Bot
+After=network.target ai-money-journal-api.service postgresql.service
+
+[Service]
+Type=simple
+WorkingDirectory=/var/www/ai-money-journal
+EnvironmentFile=/etc/ai-money-journal.env
+ExecStart=/usr/bin/node bot/index.js
+Restart=always
+RestartSec=5
+User=www-data
+Group=www-data
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

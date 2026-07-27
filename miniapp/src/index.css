@@ -1,0 +1,50 @@
+@font-face {
+  font-family: "IranSans";
+  src:
+    url("/fonts/IranSans.woff2") format("woff2"),
+    url("/fonts/IranSans.woff") format("woff");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "IranSans";
+  src:
+    url("/fonts/IranSans-Medium.woff2") format("woff2"),
+    url("/fonts/IranSans-Medium.woff") format("woff");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "IranSans";
+  src:
+    url("/fonts/IranSans-Bold.woff2") format("woff2"),
+    url("/fonts/IranSans-Bold.woff") format("woff");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  font-family: "IranSans", system-ui, sans-serif;
+}
+
+body {
+  direction: rtl;
+  text-align: right;
+  margin: 0;
+  background: var(--tg-theme-bg-color);
+  color: var(--tg-theme-text-color);
+}
+
+.ltr {
+  direction: ltr;
+  text-align: left;
+}

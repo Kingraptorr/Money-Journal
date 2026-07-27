@@ -1,0 +1,17 @@
+[Unit]
+Description=AI Money Journal API
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+WorkingDirectory=/var/www/ai-money-journal
+EnvironmentFile=/etc/ai-money-journal.env
+ExecStart=/usr/bin/node api/index.js
+Restart=always
+RestartSec=5
+User=www-data
+Group=www-data
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
