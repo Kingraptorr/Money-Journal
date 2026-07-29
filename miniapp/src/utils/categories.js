@@ -19,6 +19,27 @@ export const CATEGORY_LABELS_FA = {
   other: "سایر",
 };
 
+export const CATEGORY_ICONS = {
+  coffee: "☕",
+  nastaran: "🌸",
+  food_dining: "🍽️",
+  groceries: "🛒",
+  transportation: "🚕",
+  health: "💊",
+  subscriptions: "📺",
+  shopping: "🛍️",
+  housing: "🏠",
+  education: "📚",
+  entertainment: "🎬",
+  personal_care: "💇",
+  travel: "✈️",
+  gifts: "🎁",
+  utilities: "💡",
+  car: "🚗",
+  debts: "💳",
+  other: "🔖",
+};
+
 export const CATEGORY_COLORS = {
   coffee: "#8B5E3C",
   nastaran: "#D66BA0",

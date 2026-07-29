@@ -1,13 +1,17 @@
 import { useMemo, useState } from "react";
 import { ExpenseRow } from "../components/ExpenseRow.jsx";
-import { CATEGORY_LABELS_FA } from "../utils/categories.js";
+import { CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS_FA } from "../utils/categories.js";
 
 const CURRENCIES = ["IRT", "IRR", "EUR", "USD", "GBP", "TRY"];
+
+function toPersianDigits(value) {
+  return String(value ?? "").replace(/\d/g, (digit) => "۰۱۲۳۴۵۶۷۸۹"[Number(digit)]);
+}
 
 function EditExpenseModal({ expense, onClose, onSave }) {
   const [form, setForm] = useState({
     note: expense.note || expense.merchant || "",
-    amount: String(expense.amount ?? ""),
+    amount: toPersianDigits(expense.amount ?? ""),
     currency: expense.currency || "IRT",
     category: expense.category || "other",
     expense_date: expense.expense_date_jalali || expense.expense_date || "",
@@ -33,19 +37,29 @@ function EditExpenseModal({ expense, onClose, onSave }) {
   }
 
   return (
-    <div className="fixed inset-0 z-10 flex items-end bg-black bg-opacity-40 px-4 py-5">
-      <form className="flex w-full flex-col gap-3 rounded-card bg-tg-bg p-4 text-tg-text" onSubmit={handleSubmit}>
-        <div className="flex items-center justify-between">
+    <div className="fixed inset-0 z-10 flex items-end bg-black/40 backdrop-blur-sm">
+      <form
+        className="safe-bottom flex w-full flex-col gap-3 rounded-t-3xl bg-tg-bg p-4 pt-3 text-tg-text"
+        onSubmit={handleSubmit}
+      >
+        <div className="mx-auto h-1.5 w-10 rounded-pill bg-tg-hint bg-opacity-30" />
+
+        <div className="mb-1 flex items-center justify-between">
           <h2 className="text-lg font-bold">ویرایش خرج</h2>
-          <button type="button" className="text-sm font-medium text-tg-link" onClick={onClose}>
-            بستن
+          <button
+            type="button"
+            className="flex h-8 w-8 items-center justify-center rounded-pill bg-tg-bg2 text-sm font-medium text-tg-hint"
+            onClick={onClose}
+            aria-label="بستن"
+          >
+            ✕
           </button>
         </div>
 
         <label className="flex flex-col gap-1 text-sm font-medium text-tg-hint">
           نام خرج
           <input
-            className="rounded-card border border-tg-hint border-opacity-20 bg-tg-bg2 px-3 py-3 text-base text-tg-text outline-none"
+            className="rounded-2xl border border-tg-hint border-opacity-15 bg-tg-bg2 px-3 py-3 text-base text-tg-text outline-none focus:border-tg-link"
             value={form.note}
             onChange={(event) => updateField("note", event.target.value)}
             required
@@ -55,13 +69,13 @@ function EditExpenseModal({ expense, onClose, onSave }) {
         <label className="flex flex-col gap-1 text-sm font-medium text-tg-hint">
           دسته
           <select
-            className="rounded-card border border-tg-hint border-opacity-20 bg-tg-bg2 px-3 py-3 text-base text-tg-text outline-none"
+            className="rounded-2xl border border-tg-hint border-opacity-15 bg-tg-bg2 px-3 py-3 text-base text-tg-text outline-none focus:border-tg-link"
             value={form.category}
             onChange={(event) => updateField("category", event.target.value)}
           >
             {Object.entries(CATEGORY_LABELS_FA).map(([key, label]) => (
               <option key={key} value={key}>
-                {label}
+                {CATEGORY_ICONS[key]} {label}
               </option>
             ))}
           </select>
@@ -71,11 +85,11 @@ function EditExpenseModal({ expense, onClose, onSave }) {
           <label className="flex min-w-0 flex-col gap-1 text-sm font-medium text-tg-hint">
             مبلغ
             <input
-              className="ltr rounded-card border border-tg-hint border-opacity-20 bg-tg-bg2 px-3 py-3 text-base text-tg-text outline-none"
+              className="ltr rounded-2xl border border-tg-hint border-opacity-15 bg-tg-bg2 px-3 py-3 text-base text-tg-text outline-none focus:border-tg-link"
               dir="ltr"
               inputMode="decimal"
               value={form.amount}
-              onChange={(event) => updateField("amount", event.target.value)}
+              onChange={(event) => updateField("amount", toPersianDigits(event.target.value))}
               required
             />
           </label>
@@ -83,7 +97,7 @@ function EditExpenseModal({ expense, onClose, onSave }) {
           <label className="flex min-w-0 flex-col gap-1 text-sm font-medium text-tg-hint">
             ارز
             <select
-              className="rounded-card border border-tg-hint border-opacity-20 bg-tg-bg2 px-3 py-3 text-base text-tg-text outline-none"
+              className="rounded-2xl border border-tg-hint border-opacity-15 bg-tg-bg2 px-3 py-3 text-base text-tg-text outline-none focus:border-tg-link"
               value={form.currency}
               onChange={(event) => updateField("currency", event.target.value)}
             >
@@ -99,10 +113,10 @@ function EditExpenseModal({ expense, onClose, onSave }) {
         <label className="flex flex-col gap-1 text-sm font-medium text-tg-hint">
           تاریخ
           <input
-            className="ltr rounded-card border border-tg-hint border-opacity-20 bg-tg-bg2 px-3 py-3 text-base text-tg-text outline-none"
+            className="ltr rounded-2xl border border-tg-hint border-opacity-15 bg-tg-bg2 px-3 py-3 text-base text-tg-text outline-none focus:border-tg-link"
             dir="ltr"
             value={form.expense_date}
-            onChange={(event) => updateField("expense_date", event.target.value)}
+            onChange={(event) => updateField("expense_date", toPersianDigits(event.target.value))}
             placeholder="۱۴۰۵/۰۴/۲۱"
             required
           />
@@ -110,10 +124,10 @@ function EditExpenseModal({ expense, onClose, onSave }) {
 
         <button
           type="submit"
-          className="mt-2 rounded-card bg-tg-link px-4 py-3 text-base font-bold text-white active:opacity-80 disabled:opacity-60"
+          className="mt-2 rounded-2xl bg-tg-button px-4 py-3 text-base font-bold text-tg-buttonText transition active:scale-[0.98] disabled:opacity-60"
           disabled={saving}
         >
-          ذخیره
+          {saving ? "در حال ذخیره..." : "ذخیره"}
         </button>
       </form>
     </div>
@@ -147,56 +161,90 @@ export function History({ expenses, selectedCategory, total, onSelectCategory, o
   }, [expenses, searchQuery]);
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <button className="text-sm font-medium text-tg-link" onClick={onBack}>
-          بازگشت
+    <div className="fade-in flex flex-col gap-4">
+      <div className="flex items-center gap-3">
+        <button
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-pill bg-tg-bg2 text-tg-link transition active:scale-90"
+          onClick={onBack}
+          aria-label="بازگشت"
+        >
+          <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
         </button>
         <h1 className="text-xl font-bold text-tg-text">تاریخچه خرج‌ها</h1>
       </div>
 
-      <section className="rounded-card bg-tg-bg2 p-4">
+      <section className="rounded-3xl bg-tg-bg2 p-4 shadow-sm shadow-black/5">
         <div className="mb-2 text-sm font-medium text-tg-hint">جمع خرج این ماه</div>
         <div className="text-3xl font-bold text-tg-text">{Number(total ?? 0).toLocaleString("fa-IR")} تومان</div>
       </section>
 
-      <section className="rounded-card bg-tg-bg2 p-4">
-        <label className="mb-3 block text-sm font-medium text-tg-hint" htmlFor="category-filter">
-          فیلتر دسته
-        </label>
-        <select
-          id="category-filter"
-          className="w-full rounded-card border border-tg-hint border-opacity-20 bg-tg-bg px-3 py-3 text-sm font-medium text-tg-text outline-none"
-          value={selectedCategory ?? ""}
-          onChange={(event) => onSelectCategory(event.target.value || null)}
-        >
-          <option value="">همه دسته‌ها</option>
-          {categories.map(([key, label]) => (
-            <option key={key} value={key}>
-              {label}
-            </option>
-          ))}
-        </select>
+      <section className="rounded-3xl bg-tg-bg2 p-4 shadow-sm shadow-black/5">
+        <div className="mb-3 text-sm font-medium text-tg-hint">دسته‌ها</div>
+        <div className="hide-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+          <button
+            type="button"
+            className={`flex shrink-0 items-center gap-1 rounded-pill px-3 py-2 text-sm font-medium transition ${
+              !selectedCategory ? "bg-tg-link text-white" : "bg-tg-bg text-tg-text"
+            }`}
+            onClick={() => onSelectCategory(null)}
+          >
+            همه
+          </button>
+          {categories.map(([key, label]) => {
+            const isSelected = selectedCategory === key;
+            return (
+              <button
+                key={key}
+                type="button"
+                className={`flex shrink-0 items-center gap-1.5 rounded-pill px-3 py-2 text-sm font-medium transition ${
+                  isSelected ? "text-white" : "bg-tg-bg text-tg-text"
+                }`}
+                style={isSelected ? { backgroundColor: CATEGORY_COLORS[key] } : undefined}
+                onClick={() => onSelectCategory(key)}
+              >
+                <span>{CATEGORY_ICONS[key]}</span>
+                {label}
+              </button>
+            );
+          })}
+        </div>
       </section>
 
-      <section className="rounded-card bg-tg-bg2 p-4">
-        <label className="mb-3 block text-sm font-medium text-tg-hint" htmlFor="expense-search">
-          جستجو
+      <section className="rounded-3xl bg-tg-bg2 p-4 shadow-sm shadow-black/5">
+        <label className="relative block" htmlFor="expense-search">
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+            className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-tg-hint"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
+            <circle cx="11" cy="11" r="7" />
+            <path strokeLinecap="round" d="m20 20-3-3" />
+          </svg>
+          <input
+            id="expense-search"
+            className="w-full rounded-2xl border border-tg-hint border-opacity-15 bg-tg-bg py-3 pl-3 pr-10 text-sm font-medium text-tg-text outline-none focus:border-tg-link"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="نام خرج، دسته، مبلغ..."
+          />
         </label>
-        <input
-          id="expense-search"
-          className="w-full rounded-card border border-tg-hint border-opacity-20 bg-tg-bg px-3 py-3 text-sm font-medium text-tg-text outline-none"
-          value={searchQuery}
-          onChange={(event) => setSearchQuery(event.target.value)}
-          placeholder="نام خرج، دسته، مبلغ..."
-        />
       </section>
 
-      <section className="rounded-card bg-tg-bg2 p-4">
+      <section className="rounded-3xl bg-tg-bg2 p-4 shadow-sm shadow-black/5">
         {visibleExpenses.map((expense) => (
           <ExpenseRow key={expense.id} expense={expense} onDelete={onDelete} onEdit={setEditingExpense} />
         ))}
-        {!visibleExpenses.length ? <div className="py-8 text-center text-sm text-tg-hint">موردی نیست.</div> : null}
+        {!visibleExpenses.length ? (
+          <div className="flex flex-col items-center gap-2 py-8 text-center text-sm text-tg-hint">
+            <span className="text-3xl">🔍</span>
+            موردی نیست.
+          </div>
+        ) : null}
       </section>
 
       {editingExpense ? (

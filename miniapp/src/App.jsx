@@ -4,6 +4,7 @@ import { History } from "./screens/History.jsx";
 import { MonthNav } from "./components/MonthNav.jsx";
 import { currentJalaliMonth, monthParam, shiftMonth } from "./utils/jalali.js";
 import { deleteExpense, getChart, getHistory, getSummary, updateExpense } from "./utils/api.js";
+import { applyTheme, getInitialTheme, persistTheme } from "./utils/theme.js";
 
 export default function App() {
   const [screen, setScreen] = useState("dashboard");
@@ -14,8 +15,18 @@ export default function App() {
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [theme, setTheme] = useState(getInitialTheme);
 
   const currentMonthParam = useMemo(() => monthParam(month), [month]);
+
+  useEffect(() => {
+    applyTheme(theme);
+    persistTheme(theme);
+  }, [theme]);
+
+  function toggleTheme() {
+    setTheme((current) => (current === "dark" ? "light" : "dark"));
+  }
 
   async function loadData() {
     setLoading(true);
@@ -51,16 +62,21 @@ export default function App() {
   }
 
   return (
-    <main className="min-h-screen bg-tg-bg px-4 py-5 text-tg-text">
+    <main className="safe-bottom mx-auto min-h-screen w-full max-w-md bg-tg-bg px-4 py-5 text-tg-text">
       <MonthNav
         month={month}
         onPrev={() => setMonth((value) => shiftMonth(value, -1))}
         onNext={() => setMonth((value) => shiftMonth(value, 1))}
       />
 
-      {loading ? <div className="py-12 text-center text-sm text-tg-hint">در حال بارگذاری...</div> : null}
+      {loading ? (
+        <div className="flex flex-col items-center gap-3 py-16 text-sm text-tg-hint">
+          <span className="h-8 w-8 animate-spin rounded-full border-2 border-tg-hint border-opacity-20 border-t-tg-link" />
+          در حال بارگذاری...
+        </div>
+      ) : null}
       {error ? (
-        <div className="rounded-card bg-tg-bg2 p-4 text-sm text-tg-destructive">
+        <div className="rounded-3xl bg-tg-bg2 p-4 text-sm text-tg-destructive">
           {error === "telegram_init_data_missing"
             ? "برای دیدن داشبورد، آن را از دکمه داشبورد داخل تلگرام باز کن."
             : "دریافت اطلاعات ممکن نشد."}
@@ -75,6 +91,8 @@ export default function App() {
           selectedCategory={selectedCategory}
           onSelectCategory={setSelectedCategory}
           onOpenHistory={() => setScreen("history")}
+          theme={theme}
+          onToggleTheme={toggleTheme}
         />
       ) : null}
 

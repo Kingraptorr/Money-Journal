@@ -1,39 +1,93 @@
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
-import { CATEGORY_COLORS, CATEGORY_LABELS_FA } from "../utils/categories.js";
+import { useState } from "react";
+import { CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS_FA } from "../utils/categories.js";
 
-export function CategoryChart({ data, onSelect }) {
+const VISIBLE_LIMIT = 5;
+
+export function CategoryChart({ data, onSelect, selectedCategory }) {
+  const [expanded, setExpanded] = useState(false);
+
   if (!data.length) {
-    return <div className="py-10 text-center text-sm text-tg-hint">هنوز خرجی برای این ماه ثبت نشده.</div>;
+    return (
+      <div className="flex flex-col items-center gap-2 py-10 text-center text-sm text-tg-hint">
+        <span className="text-3xl">🌱</span>
+        هنوز خرجی برای این ماه ثبت نشده.
+      </div>
+    );
   }
 
+  const max = Math.max(...data.map((entry) => entry.total));
+  const total = data.reduce((sum, entry) => sum + entry.total, 0);
+  const visibleData = expanded ? data : data.slice(0, VISIBLE_LIMIT);
+  const hiddenCount = data.length - visibleData.length;
+
   return (
-    <ResponsiveContainer width="100%" height={220}>
-      <BarChart data={data} margin={{ top: 8, right: 0, left: 0, bottom: 40 }} barCategoryGap="30%">
-        <XAxis
-          dataKey="category"
-          tickFormatter={(key) => CATEGORY_LABELS_FA[key]}
-          tick={{ fontSize: 10, fontFamily: "IranSans", fill: "var(--tg-theme-hint-color)" }}
-          angle={-35}
-          textAnchor="end"
-          interval={0}
-        />
-        <YAxis hide />
-        <Tooltip
-          formatter={(value) => [value.toLocaleString("fa-IR") + " تومان", ""]}
-          contentStyle={{
-            fontFamily: "IranSans",
-            fontSize: 12,
-            borderRadius: 8,
-            background: "var(--tg-theme-bg-color)",
-            border: "none",
-          }}
-        />
-        <Bar dataKey="total" radius={[6, 6, 0, 0]} onClick={(entry) => onSelect(entry.category)}>
-          {data.map((entry) => (
-            <Cell key={entry.category} fill={CATEGORY_COLORS[entry.category]} />
-          ))}
-        </Bar>
-      </BarChart>
-    </ResponsiveContainer>
+    <div className="flex flex-col gap-1">
+      {visibleData.map((entry) => {
+        const barPercent = max ? Math.max(Math.round((entry.total / max) * 100), 4) : 4;
+        const share = total ? Math.round((entry.total / total) * 100) : 0;
+        const isSelected = selectedCategory === entry.category;
+        const color = CATEGORY_COLORS[entry.category] ?? CATEGORY_COLORS.other;
+
+        return (
+          <button
+            key={entry.category}
+            type="button"
+            onClick={() => onSelect(isSelected ? null : entry.category)}
+            className={`flex w-full items-center gap-3 rounded-2xl p-2 text-right transition active:scale-[0.98] ${
+              isSelected ? "bg-tg-bg" : ""
+            }`}
+          >
+            <span
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-base"
+              style={{ backgroundColor: `${color}26` }}
+            >
+              {CATEGORY_ICONS[entry.category] ?? "🔖"}
+            </span>
+
+            <div className="min-w-0 flex-1">
+              <div className="mb-1.5 flex items-center justify-between gap-2">
+                <span className="flex min-w-0 items-baseline gap-1.5">
+                  <span className="truncate text-sm font-medium text-tg-text">
+                    {CATEGORY_LABELS_FA[entry.category] ?? "سایر"}
+                  </span>
+                  <span className="shrink-0 text-xs font-medium text-tg-hint">
+                    {share.toLocaleString("fa-IR")}٪
+                  </span>
+                </span>
+                <span className="ltr shrink-0 text-sm font-bold text-tg-text" dir="ltr">
+                  {entry.total.toLocaleString("fa-IR")} تومان
+                </span>
+              </div>
+              <div className="h-2 w-full overflow-hidden rounded-pill bg-tg-hint bg-opacity-10">
+                <div
+                  className="h-full rounded-pill transition-all duration-500 ease-out"
+                  style={{ width: `${barPercent}%`, backgroundColor: color }}
+                />
+              </div>
+            </div>
+          </button>
+        );
+      })}
+
+      {data.length > VISIBLE_LIMIT ? (
+        <button
+          type="button"
+          onClick={() => setExpanded((value) => !value)}
+          className="mt-1 flex items-center justify-center gap-1 rounded-xl py-2 text-sm font-medium text-tg-link transition active:opacity-70"
+        >
+          {expanded ? "نمایش کمتر" : `${hiddenCount.toLocaleString("fa-IR")} دسته دیگر`}
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+            className={`h-4 w-4 transition-transform ${expanded ? "rotate-180" : ""}`}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="m6 9 6 6 6-6" />
+          </svg>
+        </button>
+      ) : null}
+    </div>
   );
 }
