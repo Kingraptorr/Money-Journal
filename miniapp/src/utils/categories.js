@@ -1,6 +1,6 @@
 export const CATEGORY_LABELS_FA = {
-  coffee: "Coffee",
-  nastaran: "Nastaran",
+  coffee: "قهوه",
+  nastaran: "نسترن",
   food_dining: "غذا و رستوران",
   groceries: "خرید روزانه",
   transportation: "حمل‌ونقل",

@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { ExpenseRow } from "../components/ExpenseRow.jsx";
 import { CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS_FA } from "../utils/categories.js";
 
@@ -36,7 +37,7 @@ function EditExpenseModal({ expense, onClose, onSave }) {
     }
   }
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-10 flex items-end bg-black/40 backdrop-blur-sm">
       <form
         className="safe-bottom flex w-full flex-col gap-3 rounded-t-3xl bg-tg-bg p-4 pt-3 text-tg-text"
@@ -130,7 +131,8 @@ function EditExpenseModal({ expense, onClose, onSave }) {
           {saving ? "در حال ذخیره..." : "ذخیره"}
         </button>
       </form>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
