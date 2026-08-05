@@ -3,6 +3,7 @@ import express from "express";
 import cors from "cors";
 import { authRouter } from "./routes/auth.js";
 import { expensesRouter } from "./routes/expenses.js";
+import { categoriesRouter } from "./routes/categories.js";
 import { requireAuth } from "./middleware/auth.js";
 
 const app = express();
@@ -16,6 +17,7 @@ app.get("/health", (_req, res) => {
 
 app.use("/api/auth", authRouter);
 app.use("/api/expenses", requireAuth, expensesRouter);
+app.use("/api/categories", requireAuth, categoriesRouter);
 
 app.use((error, _req, res, _next) => {
   console.error(error);

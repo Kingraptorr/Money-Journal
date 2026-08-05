@@ -19,28 +19,12 @@ function toPersianDigits(value) {
   return String(value).replace(/\d/g, (digit) => "۰۱۲۳۴۵۶۷۸۹"[Number(digit)]);
 }
 
-const VALID_CATEGORIES = new Set([
-  "coffee",
-  "nastaran",
-  "food_dining",
-  "groceries",
-  "transportation",
-  "health",
-  "subscriptions",
-  "shopping",
-  "housing",
-  "education",
-  "entertainment",
-  "personal_care",
-  "travel",
-  "gifts",
-  "utilities",
-  "car",
-  "debts",
-  "other",
-]);
-
 const VALID_CURRENCIES = new Set(["IRT", "IRR", "EUR", "USD", "GBP", "TRY"]);
+
+async function isValidCategory(userId, category) {
+  const result = await query(`SELECT 1 FROM categories WHERE user_id = $1 AND key = $2`, [userId, category]);
+  return result.rowCount > 0;
+}
 
 function normalizeDigits(value) {
   return String(value)
@@ -167,6 +151,53 @@ expensesRouter.get("/chart", async (req, res, next) => {
   }
 });
 
+expensesRouter.post("/", async (req, res, next) => {
+  try {
+    const amount = Number(normalizeDigits(req.body.amount).replace(/[,٬]/g, ""));
+    const currency = String(req.body.currency ?? "IRT").trim().toUpperCase();
+    const category = String(req.body.category ?? "").trim();
+    const note = String(req.body.note ?? "").trim();
+    const merchant = req.body.merchant ? String(req.body.merchant).trim() : null;
+    const expenseDate = parseExpenseDate(req.body.expense_date);
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      res.status(400).json({ error: "invalid_amount" });
+      return;
+    }
+
+    if (!VALID_CURRENCIES.has(currency)) {
+      res.status(400).json({ error: "invalid_currency" });
+      return;
+    }
+
+    if (!(await isValidCategory(req.user.id, category))) {
+      res.status(400).json({ error: "invalid_category" });
+      return;
+    }
+
+    if (!note) {
+      res.status(400).json({ error: "invalid_note" });
+      return;
+    }
+
+    const result = await query(
+      `INSERT INTO expenses (user_id, amount, currency, category, merchant, note, expense_date, raw_input)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING id, amount, currency, category, merchant, note, expense_date, created_at`,
+      [req.user.id, amount, currency, category, merchant, note, expenseDate, "mini_app_manual_entry"],
+    );
+
+    res.status(201).json({ expense: normalizeExpense(result.rows[0]) });
+  } catch (error) {
+    if (error.message === "invalid_date") {
+      res.status(400).json({ error: "invalid_date" });
+      return;
+    }
+
+    next(error);
+  }
+});
+
 expensesRouter.delete("/:id", async (req, res, next) => {
   try {
     const result = await query(
@@ -207,7 +238,7 @@ expensesRouter.patch("/:id", async (req, res, next) => {
       return;
     }
 
-    if (!VALID_CATEGORIES.has(category)) {
+    if (!(await isValidCategory(req.user.id, category))) {
       res.status(400).json({ error: "invalid_category" });
       return;
     }

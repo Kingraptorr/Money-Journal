@@ -1,10 +1,28 @@
 import { useEffect, useMemo, useState } from "react";
 import { Dashboard } from "./screens/Dashboard.jsx";
 import { History } from "./screens/History.jsx";
-import { MonthNav } from "./components/MonthNav.jsx";
+import { Settings } from "./screens/Settings.jsx";
+import { Categories } from "./screens/Categories.jsx";
+import { RailNav } from "./components/RailNav.jsx";
+import { TabBar } from "./components/TabBar.jsx";
+import { AddIcon, ChartIcon, HistoryIcon, HomeIcon, SettingsIcon } from "./components/Icons.jsx";
 import { currentJalaliMonth, monthParam, shiftMonth } from "./utils/jalali.js";
-import { deleteExpense, getChart, getHistory, getSummary, updateExpense } from "./utils/api.js";
-import { applyTheme, getInitialTheme, persistTheme } from "./utils/theme.js";
+import {
+  createCategory,
+  createExpense,
+  deleteCategory,
+  deleteExpense,
+  getCategories,
+  getChart,
+  getHistory,
+  getSummary,
+  updateCategory,
+  updateExpense,
+} from "./utils/api.js";
+import { ACCENT_PRIMARY, applyTheme, getInitialTheme, persistTheme } from "./utils/theme.js";
+import { displayName, getTelegramUser } from "./utils/telegramUser.js";
+
+const WIDE_BREAKPOINT = 900;
 
 export default function App() {
   const [screen, setScreen] = useState("dashboard");
@@ -13,16 +31,33 @@ export default function App() {
   const [summary, setSummary] = useState({ total: 0 });
   const [chart, setChart] = useState([]);
   const [expenses, setExpenses] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [theme, setTheme] = useState(getInitialTheme);
+  const [isWide, setIsWide] = useState(() =>
+    typeof window !== "undefined" ? window.innerWidth >= WIDE_BREAKPOINT : false,
+  );
+  const [showAddSheet, setShowAddSheet] = useState(false);
+  const [editingExpense, setEditingExpense] = useState(null);
+  const [telegramUser] = useState(getTelegramUser);
+  const [prevTotal, setPrevTotal] = useState(0);
 
   const currentMonthParam = useMemo(() => monthParam(month), [month]);
+  const previousMonthParam = useMemo(() => monthParam(shiftMonth(month, -1)), [month]);
 
   useEffect(() => {
     applyTheme(theme);
     persistTheme(theme);
   }, [theme]);
+
+  useEffect(() => {
+    function handleResize() {
+      setIsWide(window.innerWidth >= WIDE_BREAKPOINT);
+    }
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   function toggleTheme() {
     setTheme((current) => (current === "dark" ? "light" : "dark"));
@@ -32,14 +67,18 @@ export default function App() {
     setLoading(true);
     setError(null);
     try {
-      const [summaryData, chartData, historyData] = await Promise.all([
+      const [summaryData, prevSummaryData, chartData, historyData, categoriesData] = await Promise.all([
         getSummary(currentMonthParam),
+        getSummary(previousMonthParam),
         getChart(currentMonthParam),
         getHistory(currentMonthParam, selectedCategory),
+        getCategories(),
       ]);
       setSummary(summaryData ?? { total: 0 });
+      setPrevTotal(Number(prevSummaryData?.total ?? 0));
       setChart(chartData?.data ?? []);
       setExpenses(historyData?.expenses ?? []);
+      setCategories(categoriesData?.categories ?? []);
     } catch (loadError) {
       setError(loadError.message || "api_error");
     } finally {
@@ -49,64 +88,209 @@ export default function App() {
 
   useEffect(() => {
     loadData();
-  }, [currentMonthParam, selectedCategory]);
+  }, [currentMonthParam, previousMonthParam, selectedCategory]);
 
-  async function handleDelete(id) {
+  async function refreshCategories() {
+    const data = await getCategories();
+    setCategories(data?.categories ?? []);
+  }
+
+  async function handleDeleteExpense(id) {
     await deleteExpense(id);
     await loadData();
   }
 
-  async function handleUpdate(id, expense) {
+  async function handleUpdateExpense(id, expense) {
     await updateExpense(id, expense);
     await loadData();
   }
 
+  async function handleCreateExpense(expense) {
+    await createExpense(expense);
+    await loadData();
+  }
+
+  async function handleCreateCategory(category) {
+    await createCategory(category);
+    await refreshCategories();
+  }
+
+  async function handleUpdateCategory(key, category) {
+    await updateCategory(key, category);
+    await refreshCategories();
+  }
+
+  async function handleDeleteCategory(key) {
+    await deleteCategory(key);
+    await refreshCategories();
+  }
+
+  function openAddSheet() {
+    setEditingExpense(null);
+    setShowAddSheet(true);
+    setScreen("history");
+  }
+
+  function requestEdit(expense) {
+    setEditingExpense(expense);
+    setShowAddSheet(true);
+  }
+
+  const total = Number(summary.total ?? 0);
+  const avatarPhotoUrl = telegramUser?.photoUrl ?? null;
+  const avatarName = displayName(telegramUser);
+
+  const railActive = { activeBg: `${ACCENT_PRIMARY}1f`, activeColor: ACCENT_PRIMARY };
+  const railInactive = { activeBg: "transparent", activeColor: "var(--tg-theme-hint-color)" };
+  const navItems = [
+    {
+      key: "dashboard",
+      label: "خانه",
+      icon: <HomeIcon />,
+      ...(screen === "dashboard" ? railActive : railInactive),
+      onClick: () => setScreen("dashboard"),
+    },
+    {
+      key: "history",
+      label: "تاریخچه",
+      icon: <HistoryIcon />,
+      ...(screen === "history" ? railActive : railInactive),
+      onClick: () => setScreen("history"),
+    },
+    {
+      key: "add",
+      label: "افزودن",
+      icon: <AddIcon />,
+      activeBg: "var(--tg-theme-button-color)",
+      activeColor: "#ffffff",
+      onClick: openAddSheet,
+    },
+    {
+      key: "report",
+      label: "گزارش",
+      icon: <ChartIcon />,
+      ...railInactive,
+      onClick: () => {},
+    },
+    {
+      key: "settings",
+      label: "تنظیمات",
+      icon: <SettingsIcon />,
+      ...(screen === "settings" ? railActive : railInactive),
+      onClick: () => setScreen("settings"),
+    },
+  ];
+
+  const tabItems = navItems.map((item) => ({
+    key: item.key,
+    label: item.label,
+    icon: item.icon,
+    onClick: item.onClick,
+    color: item.key === "add" ? "#ffffff" : item.activeColor,
+    bg: item.key === "add" ? "var(--tg-theme-button-color)" : item.activeBg,
+  }));
+
   return (
-    <main className="safe-bottom mx-auto min-h-screen w-full max-w-md bg-tg-bg px-4 py-5 text-tg-text">
-      <MonthNav
-        month={month}
-        onPrev={() => setMonth((value) => shiftMonth(value, -1))}
-        onNext={() => setMonth((value) => shiftMonth(value, 1))}
+    <div dir="rtl" className="relative flex min-h-screen justify-center bg-tg-bg text-tg-text">
+      <div
+        className="pointer-events-none fixed -right-[10%] -top-[10%] h-[60vw] max-h-[600px] w-[60vw] max-w-[600px] rounded-full opacity-[.32] blur-[80px]"
+        style={{ background: "var(--tg-theme-button-color)" }}
+      />
+      <div
+        className="pointer-events-none fixed -left-[10%] -bottom-[15%] h-[50vw] max-h-[500px] w-[50vw] max-w-[500px] rounded-full opacity-[.22] blur-[90px]"
+        style={{ background: "var(--tg-theme-button-color)" }}
       />
 
-      {loading ? (
-        <div className="flex flex-col items-center gap-3 py-16 text-sm text-tg-hint">
-          <span className="h-8 w-8 animate-spin rounded-full border-2 border-tg-hint border-opacity-20 border-t-tg-link" />
-          در حال بارگذاری...
-        </div>
-      ) : null}
-      {error ? (
-        <div className="rounded-3xl bg-tg-bg2 p-4 text-sm text-tg-destructive">
-          {error === "telegram_init_data_missing"
-            ? "برای دیدن داشبورد، آن را از دکمه داشبورد داخل تلگرام باز کن."
-            : "دریافت اطلاعات ممکن نشد."}
-        </div>
-      ) : null}
+      <div className="relative flex w-full max-w-[1180px]">
+        {isWide ? (
+          <RailNav items={navItems} avatarPhotoUrl={avatarPhotoUrl} avatarName={avatarName} />
+        ) : null}
 
-      {!loading && !error && screen === "dashboard" ? (
-        <Dashboard
-          total={Number(summary.total ?? 0)}
-          chartData={chart}
-          expenses={expenses}
-          selectedCategory={selectedCategory}
-          onSelectCategory={setSelectedCategory}
-          onOpenHistory={() => setScreen("history")}
-          theme={theme}
-          onToggleTheme={toggleTheme}
-        />
-      ) : null}
+        <main
+          className="safe-bottom flex min-w-0 flex-1 flex-col gap-4"
+          style={{ padding: isWide ? "28px 32px 100px" : "18px 16px 96px" }}
+        >
+          {loading ? (
+            <div className="flex flex-col items-center gap-3 py-16 text-sm text-tg-hint">
+              <span className="h-8 w-8 animate-spin rounded-full border-2 border-tg-hint border-opacity-20 border-t-tg-link" />
+              در حال بارگذاری...
+            </div>
+          ) : null}
+          {error ? (
+            <div className="glass-card rounded-3xl p-4 text-sm text-tg-destructive" style={{ background: "var(--tg-theme-secondary-bg-color)", border: "1px solid var(--app-glass-border)" }}>
+              {error === "telegram_init_data_missing"
+                ? "برای دیدن داشبورد، آن را از دکمه داشبورد داخل تلگرام باز کن."
+                : "دریافت اطلاعات ممکن نشد."}
+            </div>
+          ) : null}
 
-      {!loading && !error && screen === "history" ? (
-        <History
-          expenses={expenses}
-          selectedCategory={selectedCategory}
-          total={Number(summary.total ?? 0)}
-          onSelectCategory={setSelectedCategory}
-          onBack={() => setScreen("dashboard")}
-          onDelete={handleDelete}
-          onUpdate={handleUpdate}
-        />
-      ) : null}
-    </main>
+          {!loading && !error && screen === "dashboard" ? (
+            <Dashboard
+              month={month}
+              onPrevMonth={() => setMonth((value) => shiftMonth(value, -1))}
+              onNextMonth={() => setMonth((value) => shiftMonth(value, 1))}
+              total={total}
+              prevTotal={prevTotal}
+              chartData={chart}
+              categories={categories}
+              expenses={expenses}
+              selectedCategory={selectedCategory}
+              onSelectCategory={setSelectedCategory}
+              onOpenHistory={() => setScreen("history")}
+              isWide={isWide}
+              avatarPhotoUrl={avatarPhotoUrl}
+              avatarName={avatarName}
+              userFirstName={telegramUser?.firstName || avatarName}
+            />
+          ) : null}
+
+          {!loading && !error && screen === "history" ? (
+            <History
+              month={month}
+              onPrevMonth={() => setMonth((value) => shiftMonth(value, -1))}
+              onNextMonth={() => setMonth((value) => shiftMonth(value, 1))}
+              total={total}
+              categories={categories}
+              expenses={expenses}
+              selectedCategory={selectedCategory}
+              onSelectCategory={setSelectedCategory}
+              onDelete={handleDeleteExpense}
+              onCreate={handleCreateExpense}
+              onUpdate={handleUpdateExpense}
+              addSheetOpen={showAddSheet}
+              onCloseAdd={() => setShowAddSheet(false)}
+              editingExpense={editingExpense}
+              onRequestEdit={requestEdit}
+              isWide={isWide}
+              avatarPhotoUrl={avatarPhotoUrl}
+              avatarName={avatarName}
+            />
+          ) : null}
+
+          {!loading && !error && screen === "settings" ? (
+            <Settings
+              theme={theme}
+              onToggleTheme={toggleTheme}
+              onOpenCategories={() => setScreen("categories")}
+              isWide={isWide}
+              avatarPhotoUrl={avatarPhotoUrl}
+              avatarName={avatarName}
+            />
+          ) : null}
+
+          {!loading && !error && screen === "categories" ? (
+            <Categories
+              categories={categories}
+              onBack={() => setScreen("settings")}
+              onCreate={handleCreateCategory}
+              onUpdate={handleUpdateCategory}
+              onDelete={handleDeleteCategory}
+            />
+          ) : null}
+        </main>
+      </div>
+
+      {!isWide ? <TabBar items={tabItems} /> : null}
+    </div>
   );
 }

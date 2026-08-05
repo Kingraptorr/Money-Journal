@@ -1,10 +1,9 @@
-import { CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS_FA } from "../utils/categories.js";
+import { CategoryIcon, EditIcon, TrashIcon } from "./Icons.jsx";
 
-export function ExpenseRow({ expense, onDelete, onEdit }) {
-  const label = CATEGORY_LABELS_FA[expense.category] ?? "سایر";
+export function ExpenseRow({ expense, categories, onDelete, onEdit }) {
+  const cat = categories.find((c) => c.key === expense.category) ?? { key: expense.category, label: "سایر", color: "#7A7A7A" };
   const currency = expense.currency === "IRT" ? "تومان" : expense.currency;
-  const expenseName = expense.note || expense.merchant || label;
-  const color = CATEGORY_COLORS[expense.category] ?? CATEGORY_COLORS.other;
+  const expenseName = expense.note || expense.merchant || cat.label;
 
   function requestDelete() {
     if (!onDelete) return;
@@ -15,7 +14,8 @@ export function ExpenseRow({ expense, onDelete, onEdit }) {
 
   return (
     <div
-      className="flex flex-col gap-2 border-b border-tg-hint border-opacity-10 py-3 last:border-0"
+      className="flex flex-col gap-2 py-3 last:border-0"
+      style={{ borderBottom: "1px solid var(--app-divider-color)" }}
       onDoubleClick={requestDelete}
       onContextMenu={(event) => {
         event.preventDefault();
@@ -24,10 +24,10 @@ export function ExpenseRow({ expense, onDelete, onEdit }) {
     >
       <div className="flex items-center gap-3">
         <span
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-lg"
-          style={{ backgroundColor: `${color}26` }}
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full"
+          style={{ backgroundColor: `${cat.color}26`, color: cat.color }}
         >
-          {CATEGORY_ICONS[expense.category] ?? "🔖"}
+          <CategoryIcon category={cat.key} icon={cat.icon} />
         </span>
         <span className="min-w-0 flex-1 break-words text-base font-medium leading-snug text-tg-text">
           {expenseName}
@@ -36,7 +36,7 @@ export function ExpenseRow({ expense, onDelete, onEdit }) {
 
       <div className="flex items-center justify-between gap-2">
         <span className="truncate text-xs text-tg-hint">
-          {[label, expense.expense_date_jalali].filter(Boolean).join(" · ")}
+          {[cat.label, expense.expense_date_jalali].filter(Boolean).join(" · ")}
         </span>
 
         <div className="flex shrink-0 items-center gap-1">
@@ -45,31 +45,23 @@ export function ExpenseRow({ expense, onDelete, onEdit }) {
           </span>
           {onEdit ? (
             <button
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-pill text-tg-link transition active:scale-90 active:bg-tg-bg"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-pill text-tg-link transition active:scale-90"
               onClick={() => onEdit(expense)}
               aria-label="ویرایش"
               title="ویرایش"
             >
-              <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M12 20h9" />
-                <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
-              </svg>
+              <EditIcon />
             </button>
           ) : null}
           {onDelete ? (
             <button
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-pill text-tg-destructive transition active:scale-90 active:bg-tg-bg"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-pill transition active:scale-90"
+              style={{ background: "var(--app-delete-bg)", color: "var(--tg-theme-destructive-text-color)" }}
               onClick={requestDelete}
               aria-label="حذف"
               title="حذف"
             >
-              <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M3 6h18" />
-                <path d="M8 6V4h8v2" />
-                <path d="M19 6l-1 14H6L5 6" />
-                <path d="M10 11v5" />
-                <path d="M14 11v5" />
-              </svg>
+              <TrashIcon />
             </button>
           ) : null}
         </div>

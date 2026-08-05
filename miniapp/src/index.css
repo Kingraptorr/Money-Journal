@@ -1,31 +1,31 @@
 @font-face {
-  font-family: "IranSans";
-  src:
-    url("/fonts/IranSans.woff2") format("woff2"),
-    url("/fonts/IranSans.woff") format("woff");
-  font-weight: 400;
+  font-family: "Vazirmatn";
+  src: url("/fonts/Vazirmatn-arabic.woff2") format("woff2");
+  font-weight: 100 900;
   font-style: normal;
   font-display: swap;
+  unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E,
+    U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC;
 }
 
 @font-face {
-  font-family: "IranSans";
-  src:
-    url("/fonts/IranSans-Medium.woff2") format("woff2"),
-    url("/fonts/IranSans-Medium.woff") format("woff");
-  font-weight: 500;
+  font-family: "Vazirmatn";
+  src: url("/fonts/Vazirmatn-latin-ext.woff2") format("woff2");
+  font-weight: 100 900;
   font-style: normal;
   font-display: swap;
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 
 @font-face {
-  font-family: "IranSans";
-  src:
-    url("/fonts/IranSans-Bold.woff2") format("woff2"),
-    url("/fonts/IranSans-Bold.woff") format("woff");
-  font-weight: 700;
+  font-family: "Vazirmatn";
+  src: url("/fonts/Vazirmatn-latin.woff2") format("woff2");
+  font-weight: 100 900;
   font-style: normal;
   font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
 @tailwind base;
@@ -33,31 +33,50 @@
 @tailwind utilities;
 
 :root {
-  --tg-theme-bg-color: #ffffff;
-  --tg-theme-secondary-bg-color: #f1f1f1;
-  --tg-theme-text-color: #000000;
-  --tg-theme-hint-color: #999999;
-  --tg-theme-link-color: #2481cc;
-  --tg-theme-button-color: #2481cc;
+  --tg-theme-bg-color: #f0f0f0;
+  --tg-theme-secondary-bg-color: rgba(255, 255, 255, 0.55);
+  --tg-theme-text-color: #111111;
+  --tg-theme-hint-color: #7a7a7a;
+  --tg-theme-link-color: #3ddc97;
+  --tg-theme-button-color: #3ddc97;
   --tg-theme-button-text-color: #ffffff;
-  --tg-theme-destructive-text-color: #ff3b30;
+  --tg-theme-destructive-text-color: #d9534f;
+  --app-subtle-bg: #eeeeee;
+  --app-track-bg: rgba(0, 0, 0, 0.06);
+  --app-divider-color: rgba(0, 0, 0, 0.06);
+  --app-glass-border: rgba(255, 255, 255, 0.6);
+  --app-shadow: 0 10px 26px -16px rgba(0, 0, 0, 0.14);
+  --app-theme-icon-color: #6c7ae0;
+  --app-theme-icon-bg: rgba(108, 122, 224, 0.15);
+  --app-delete-bg: rgba(217, 83, 79, 0.1);
+  --app-hero-text: #111111;
+  --app-hero-subtext: rgba(0, 0, 0, 0.72);
+  --app-hero-chip-bg: rgba(0, 0, 0, 0.08);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --tg-theme-bg-color: #17212b;
-    --tg-theme-secondary-bg-color: #232e3c;
-    --tg-theme-text-color: #f5f5f5;
-    --tg-theme-hint-color: #7d8b99;
-    --tg-theme-link-color: #6ab3f3;
-    --tg-theme-button-color: #5288c1;
+    --tg-theme-bg-color: #0d0d0d;
+    --tg-theme-secondary-bg-color: rgba(30, 30, 30, 0.55);
+    --tg-theme-text-color: #f2f2f2;
+    --tg-theme-hint-color: #8a8a8a;
+    --tg-theme-link-color: #3ddc97;
+    --tg-theme-button-color: #3ddc97;
     --tg-theme-button-text-color: #ffffff;
-    --tg-theme-destructive-text-color: #ff595a;
+    --tg-theme-destructive-text-color: #d9534f;
+    --app-subtle-bg: #262626;
+    --app-track-bg: rgba(255, 255, 255, 0.08);
+    --app-divider-color: rgba(255, 255, 255, 0.07);
+    --app-glass-border: rgba(255, 255, 255, 0.12);
+    --app-shadow: 0 10px 26px -16px rgba(0, 0, 0, 0.6);
+    --app-theme-icon-color: #e8a33d;
+    --app-theme-icon-bg: rgba(232, 163, 61, 0.15);
+    --app-delete-bg: rgba(217, 83, 79, 0.16);
   }
 }
 
 * {
-  font-family: "IranSans", system-ui, sans-serif;
+  font-family: "Vazirmatn", system-ui, sans-serif;
 }
 
 body {
@@ -86,10 +105,15 @@ body {
   display: none;
 }
 
+.glass-card {
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;
-    transform: translateY(6px);
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
@@ -98,5 +122,5 @@ body {
 }
 
 .fade-in {
-  animation: fadeIn 0.25s ease both;
+  animation: fadeIn 0.4s ease both;
 }

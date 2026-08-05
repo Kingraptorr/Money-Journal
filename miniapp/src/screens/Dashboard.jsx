@@ -1,65 +1,83 @@
 import { CategoryChart } from "../components/CategoryChart.jsx";
 import { ExpenseRow } from "../components/ExpenseRow.jsx";
+import { MonthNav } from "../components/MonthNav.jsx";
+import { ScreenHeader } from "../components/ScreenHeader.jsx";
 
-function SunIcon(props) {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...props}>
-      <circle cx="12" cy="12" r="4.5" />
-      <path
-        strokeLinecap="round"
-        d="M12 2.5v2.25M12 19.25v2.25M4.4 4.4l1.6 1.6M18 18l1.6 1.6M2.5 12h2.25M19.25 12h2.25M4.4 19.6l1.6-1.6M18 6l1.6-1.6"
-      />
-    </svg>
-  );
-}
+const cardStyle = {
+  background: "var(--tg-theme-secondary-bg-color)",
+  border: "1px solid var(--app-glass-border)",
+  boxShadow: "var(--app-shadow)",
+};
 
-function MoonIcon(props) {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...props}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" />
-    </svg>
-  );
+function trendInfo(total, prevTotal) {
+  if (!prevTotal) return { icon: "🌱", text: "این اولین ماهیه که خرج ثبت کردی." };
+  const diffPercent = Math.round(((total - prevTotal) / prevTotal) * 100);
+  const absPercent = Math.abs(diffPercent).toLocaleString("fa-IR");
+  if (diffPercent < 0) return { icon: "📉", text: `نسبت به ماه قبل ${absPercent}٪ کمتر خرج کردی — همینطوری ادامه بده!` };
+  if (diffPercent > 0) return { icon: "📈", text: `نسبت به ماه قبل ${absPercent}٪ بیشتر خرج کردی.` };
+  return { icon: "➖", text: "خرجت نسبت به ماه قبل تغییری نکرده." };
 }
 
 export function Dashboard({
+  month,
+  onPrevMonth,
+  onNextMonth,
   total,
+  prevTotal,
   chartData,
+  categories,
   expenses,
   selectedCategory,
   onSelectCategory,
   onOpenHistory,
-  theme,
-  onToggleTheme,
+  isWide,
+  avatarPhotoUrl,
+  avatarName,
+  userFirstName,
 }) {
   const visibleExpenses = selectedCategory
     ? expenses.filter((expense) => expense.category === selectedCategory)
     : expenses;
 
+  const trend = trendInfo(total, prevTotal);
+
   return (
     <div className="fade-in flex flex-col gap-4">
-      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-tg-button to-tg-link p-5 shadow-lg shadow-black/10">
+      <ScreenHeader
+        subtitle={userFirstName ? `سلام ${userFirstName}! این خلاصه‌ی ماه توئه 🌿` : "سلام! این خلاصه‌ی ماه توئه 🌿"}
+        title="دفتر مالی من"
+        isWide={isWide}
+        avatarPhotoUrl={avatarPhotoUrl}
+        avatarName={avatarName}
+      />
+
+      <MonthNav month={month} onPrev={onPrevMonth} onNext={onNextMonth} />
+
+      <section
+        className="relative overflow-hidden rounded-3xl p-5 shadow-lg"
+        style={{ background: "var(--tg-theme-button-color)", boxShadow: "0 14px 28px -16px var(--tg-theme-button-color)" }}
+      >
         <div className="pointer-events-none absolute -left-6 -top-10 h-32 w-32 rounded-full bg-white/10" />
         <div className="pointer-events-none absolute -right-8 bottom-[-2.5rem] h-28 w-28 rounded-full bg-white/10" />
-        <div className="relative mb-2 flex items-center justify-between">
-          <span className="text-sm font-medium text-white/80">خرج این ماه</span>
-          {onToggleTheme ? (
-            <button
-              type="button"
-              onClick={onToggleTheme}
-              aria-label={theme === "dark" ? "حالت روشن" : "حالت تیره"}
-              title={theme === "dark" ? "حالت روشن" : "حالت تیره"}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/15 text-white transition active:scale-90"
-            >
-              {theme === "dark" ? <SunIcon className="h-4 w-4" /> : <MoonIcon className="h-4 w-4" />}
-            </button>
-          ) : null}
+        <div className="relative mb-2 text-sm font-medium" style={{ color: "var(--app-hero-subtext)" }}>
+          خرج این ماه
         </div>
-        <div className="relative text-4xl font-extrabold leading-tight text-white">
-          {total.toLocaleString("fa-IR")} <span className="text-lg font-medium text-white/80">تومان</span>
+        <div className="relative text-4xl font-extrabold leading-tight" style={{ color: "var(--app-hero-text)" }}>
+          {total.toLocaleString("fa-IR")}{" "}
+          <span className="text-lg font-medium" style={{ color: "var(--app-hero-subtext)" }}>
+            تومان
+          </span>
+        </div>
+        <div
+          className="relative mt-3 inline-flex items-center gap-1.5 rounded-pill px-3 py-1.5 text-[13px]"
+          style={{ background: "var(--app-hero-chip-bg)", color: "var(--app-hero-text)" }}
+        >
+          <span>{trend.icon}</span>
+          <span>{trend.text}</span>
         </div>
       </section>
 
-      <section className="rounded-3xl bg-tg-bg2 p-4 shadow-sm shadow-black/5">
+      <section className="glass-card rounded-3xl p-4" style={cardStyle}>
         <div className="mb-2 flex items-center justify-between">
           <span className="text-sm font-semibold text-tg-text">دسته‌بندی‌ها</span>
           {selectedCategory ? (
@@ -68,10 +86,15 @@ export function Dashboard({
             </button>
           ) : null}
         </div>
-        <CategoryChart data={chartData} onSelect={onSelectCategory} selectedCategory={selectedCategory} />
+        <CategoryChart
+          data={chartData}
+          categories={categories}
+          onSelect={onSelectCategory}
+          selectedCategory={selectedCategory}
+        />
       </section>
 
-      <section className="rounded-3xl bg-tg-bg2 p-4 shadow-sm shadow-black/5">
+      <section className="glass-card rounded-3xl p-4" style={cardStyle}>
         <div className="mb-2 flex items-center justify-between">
           <span className="text-sm font-semibold text-tg-text">آخرین خرج‌ها</span>
           <button className="text-sm font-medium text-tg-link" onClick={onOpenHistory}>
@@ -80,7 +103,7 @@ export function Dashboard({
         </div>
         <div className="flex flex-col">
           {visibleExpenses.slice(0, 5).map((expense) => (
-            <ExpenseRow key={expense.id} expense={expense} />
+            <ExpenseRow key={expense.id} expense={expense} categories={categories} />
           ))}
         </div>
         {!visibleExpenses.length ? (
@@ -90,6 +113,10 @@ export function Dashboard({
           </div>
         ) : null}
       </section>
+
+      <div className="px-1.5 pb-0.5 pt-1 text-center text-[12.5px] text-tg-hint">
+        هر روز ثبت کن، هر ماه واضح‌تر ببین.
+      </div>
     </div>
   );
 }

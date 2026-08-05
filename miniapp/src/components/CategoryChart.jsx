@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS_FA } from "../utils/categories.js";
+import { CategoryIcon, ChevronIcon } from "./Icons.jsx";
 
 const VISIBLE_LIMIT = 5;
 
-export function CategoryChart({ data, onSelect, selectedCategory }) {
+export function CategoryChart({ data, categories, onSelect, selectedCategory }) {
   const [expanded, setExpanded] = useState(false);
 
   if (!data.length) {
@@ -13,6 +13,10 @@ export function CategoryChart({ data, onSelect, selectedCategory }) {
         هنوز خرجی برای این ماه ثبت نشده.
       </div>
     );
+  }
+
+  function categoryFor(key) {
+    return categories.find((cat) => cat.key === key) ?? { key, label: "سایر", color: "#7A7A7A" };
   }
 
   const max = Math.max(...data.map((entry) => entry.total));
@@ -26,30 +30,27 @@ export function CategoryChart({ data, onSelect, selectedCategory }) {
         const barPercent = max ? Math.max(Math.round((entry.total / max) * 100), 4) : 4;
         const share = total ? Math.round((entry.total / total) * 100) : 0;
         const isSelected = selectedCategory === entry.category;
-        const color = CATEGORY_COLORS[entry.category] ?? CATEGORY_COLORS.other;
+        const cat = categoryFor(entry.category);
 
         return (
           <button
             key={entry.category}
             type="button"
             onClick={() => onSelect(isSelected ? null : entry.category)}
-            className={`flex w-full items-center gap-3 rounded-2xl p-2 text-right transition active:scale-[0.98] ${
-              isSelected ? "bg-tg-bg" : ""
-            }`}
+            className="flex w-full items-center gap-3 rounded-2xl p-2 text-right transition active:scale-[0.98]"
+            style={{ background: isSelected ? "var(--app-subtle-bg)" : "transparent" }}
           >
             <span
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-base"
-              style={{ backgroundColor: `${color}26` }}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
+              style={{ backgroundColor: `${cat.color}26`, color: cat.color }}
             >
-              {CATEGORY_ICONS[entry.category] ?? "🔖"}
+              <CategoryIcon category={cat.key} icon={cat.icon} size={18} />
             </span>
 
             <div className="min-w-0 flex-1">
               <div className="mb-1.5 flex items-center justify-between gap-2">
                 <span className="flex min-w-0 items-baseline gap-1.5">
-                  <span className="truncate text-sm font-medium text-tg-text">
-                    {CATEGORY_LABELS_FA[entry.category] ?? "سایر"}
-                  </span>
+                  <span className="truncate text-sm font-medium text-tg-text">{cat.label}</span>
                   <span className="shrink-0 text-xs font-medium text-tg-hint">
                     {share.toLocaleString("fa-IR")}٪
                   </span>
@@ -58,10 +59,10 @@ export function CategoryChart({ data, onSelect, selectedCategory }) {
                   {entry.total.toLocaleString("fa-IR")} تومان
                 </span>
               </div>
-              <div className="h-2 w-full overflow-hidden rounded-pill bg-tg-hint bg-opacity-10">
+              <div className="h-2 w-full overflow-hidden rounded-pill" style={{ background: "var(--app-track-bg)" }}>
                 <div
                   className="h-full rounded-pill transition-all duration-500 ease-out"
-                  style={{ width: `${barPercent}%`, backgroundColor: color }}
+                  style={{ width: `${barPercent}%`, backgroundColor: cat.color }}
                 />
               </div>
             </div>
@@ -76,16 +77,7 @@ export function CategoryChart({ data, onSelect, selectedCategory }) {
           className="mt-1 flex items-center justify-center gap-1 rounded-xl py-2 text-sm font-medium text-tg-link transition active:opacity-70"
         >
           {expanded ? "نمایش کمتر" : `${hiddenCount.toLocaleString("fa-IR")} دسته دیگر`}
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 24 24"
-            className={`h-4 w-4 transition-transform ${expanded ? "rotate-180" : ""}`}
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" d="m6 9 6 6 6-6" />
-          </svg>
+          <ChevronIcon size={16} className={`transition-transform ${expanded ? "-rotate-90" : "rotate-90"}`} />
         </button>
       ) : null}
     </div>

@@ -35,7 +35,16 @@ async function api(path, options = {}) {
     },
   });
 
-  if (!response.ok) throw new Error("api_error");
+  if (!response.ok) {
+    let code = "api_error";
+    try {
+      const body = await response.json();
+      if (body?.error) code = body.error;
+    } catch {
+      // response had no JSON body; keep the generic code
+    }
+    throw new Error(code);
+  }
   return response.json();
 }
 
@@ -62,4 +71,36 @@ export function updateExpense(id, expense) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(expense),
   });
+}
+
+export function createExpense(expense) {
+  return api(`/api/expenses`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(expense),
+  });
+}
+
+export function getCategories() {
+  return api(`/api/categories`, { fallback: { categories: [] } });
+}
+
+export function createCategory(category) {
+  return api(`/api/categories`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(category),
+  });
+}
+
+export function updateCategory(key, category) {
+  return api(`/api/categories/${key}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(category),
+  });
+}
+
+export function deleteCategory(key) {
+  return api(`/api/categories/${key}`, { method: "DELETE" });
 }

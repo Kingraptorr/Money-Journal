@@ -12,14 +12,22 @@ export default {
           button: "var(--tg-theme-button-color)",
           buttonText: "var(--tg-theme-button-text-color)",
           destructive: "var(--tg-theme-destructive-text-color)",
+          subtle: "var(--app-subtle-bg)",
+          track: "var(--app-track-bg)",
+          divider: "var(--app-divider-color)",
+          glassBorder: "var(--app-glass-border)",
+          deleteBg: "var(--app-delete-bg)",
         },
       },
       fontFamily: {
-        sans: ["IranSans", "system-ui", "sans-serif"],
+        sans: ["Vazirmatn", "system-ui", "sans-serif"],
       },
       borderRadius: {
         card: "16px",
         pill: "999px",
+      },
+      boxShadow: {
+        glass: "var(--app-shadow)",
       },
     },
   },
