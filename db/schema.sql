@@ -42,3 +42,16 @@ CREATE TABLE IF NOT EXISTS categories (
 ALTER TABLE categories ADD COLUMN IF NOT EXISTS icon TEXT;
 
 CREATE INDEX IF NOT EXISTS idx_categories_user ON categories(user_id);
+
+CREATE TABLE IF NOT EXISTS ai_reports (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id BIGINT REFERENCES users(id) ON DELETE CASCADE,
+  month TEXT NOT NULL,
+  kind TEXT NOT NULL CHECK (kind IN ('summary', 'deeper')),
+  content TEXT NOT NULL,
+  has_data BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_reports_user_created ON ai_reports(user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_ai_reports_user_month ON ai_reports(user_id, month, created_at);

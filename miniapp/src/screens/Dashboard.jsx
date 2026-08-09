@@ -9,7 +9,8 @@ const cardStyle = {
   boxShadow: "var(--app-shadow)",
 };
 
-function trendInfo(total, prevTotal) {
+function trendInfo(total, prevTotal, eligible) {
+  if (!eligible) return { icon: "⏳", text: "برای مقایسه با ماه قبل چند روز دیگه صبر کن." };
   if (!prevTotal) return { icon: "🌱", text: "این اولین ماهیه که خرج ثبت کردی." };
   const diffPercent = Math.round(((total - prevTotal) / prevTotal) * 100);
   const absPercent = Math.abs(diffPercent).toLocaleString("fa-IR");
@@ -24,6 +25,7 @@ export function Dashboard({
   onNextMonth,
   total,
   prevTotal,
+  trendEligible = true,
   chartData,
   categories,
   expenses,
@@ -39,7 +41,7 @@ export function Dashboard({
     ? expenses.filter((expense) => expense.category === selectedCategory)
     : expenses;
 
-  const trend = trendInfo(total, prevTotal);
+  const trend = trendInfo(total, prevTotal, trendEligible);
 
   return (
     <div className="fade-in flex flex-col gap-4">

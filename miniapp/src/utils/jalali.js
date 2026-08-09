@@ -26,6 +26,10 @@ export function currentJalaliMonth() {
   return { jy, jm };
 }
 
+export function currentJalaliDate() {
+  return jalaali.toJalaali(new Date());
+}
+
 export function monthLabel(month) {
   return `${JALALI_MONTHS[month.jm - 1]} ${month.jy.toLocaleString("fa-IR", { useGrouping: false })}`;
 }

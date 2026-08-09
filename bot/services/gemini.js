@@ -505,7 +505,7 @@ export async function normalizeVoiceTranscript(transcription) {
   }
 
   const model = genAI.getGenerativeModel({
-    model: process.env.GEMINI_MODEL || "gemini-2.5-flash",
+    model: process.env.GEMINI_MODEL || "gemini-3.5-flash-lite",
     systemInstruction: `You clean up Persian speech-to-text output for an expense logging bot.
 The transcript may contain background-noise mistakes, typos, homophones, wrong spacing, or malformed Persian words.
 Infer the most likely expense phrase only when enough evidence exists.
@@ -584,7 +584,7 @@ export async function extractExpense(userMessage) {
       .replace(/{{LAST_THURSDAY_ISO}}/g, dates.LAST_THURSDAY_ISO);
 
   const model = genAI.getGenerativeModel({
-    model: process.env.GEMINI_MODEL || "gemini-2.5-flash",
+    model: process.env.GEMINI_MODEL || "gemini-3.5-flash-lite",
     systemInstruction: replaceDates(SYSTEM_PROMPT),
     generationConfig: {
       responseMimeType: "application/json",

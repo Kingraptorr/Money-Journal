@@ -53,17 +53,24 @@ function parseExpenseDate(value) {
   return `${gy}-${String(gm).padStart(2, "0")}-${String(gd).padStart(2, "0")}`;
 }
 
-function jalaliMonthRange(month) {
+export function jalaliMonthRange(month, days) {
   const [jy, jm] = month.split("-").map(Number);
   if (!jy || !jm || jm < 1 || jm > 12) {
     throw new Error("invalid_month");
   }
 
   const start = jalaali.toGregorian(jy, jm, 1);
-  const nextJm = jm === 12 ? 1 : jm + 1;
-  const nextJy = jm === 12 ? jy + 1 : jy;
-  const end = jalaali.toGregorian(nextJy, nextJm, 1);
   const pad = (n) => String(n).padStart(2, "0");
+  const monthLength = jalaali.jalaaliMonthLength(jy, jm);
+
+  let end;
+  if (days && days > 0 && days < monthLength) {
+    end = jalaali.toGregorian(jy, jm, days + 1);
+  } else {
+    const nextJm = jm === 12 ? 1 : jm + 1;
+    const nextJy = jm === 12 ? jy + 1 : jy;
+    end = jalaali.toGregorian(nextJy, nextJm, 1);
+  }
 
   return {
     start: `${start.gy}-${pad(start.gm)}-${pad(start.gd)}`,
@@ -83,7 +90,8 @@ function normalizeExpense(row) {
 
 expensesRouter.get("/summary", async (req, res, next) => {
   try {
-    const { start, end } = jalaliMonthRange(req.query.month);
+    const days = req.query.days ? Number(req.query.days) : null;
+    const { start, end } = jalaliMonthRange(req.query.month, days);
     const totalResult = await query(
       `SELECT COALESCE(SUM(amount), 0)::float AS total
        FROM expenses

@@ -48,8 +48,9 @@ async function api(path, options = {}) {
   return response.json();
 }
 
-export function getSummary(month) {
-  return api(`/api/expenses/summary?month=${month}`, { fallback: { total: 0 } });
+export function getSummary(month, days) {
+  const daysQuery = days ? `&days=${days}` : "";
+  return api(`/api/expenses/summary?month=${month}${daysQuery}`, { fallback: { total: 0 } });
 }
 
 export function getChart(month) {
@@ -103,4 +104,22 @@ export function updateCategory(key, category) {
 
 export function deleteCategory(key) {
   return api(`/api/categories/${key}`, { method: "DELETE" });
+}
+
+export function getReportStatus(month) {
+  return api(`/api/reports/status?month=${month}`, {
+    fallback: { eligible: false, reason: "unknown", eligibleAt: null },
+  });
+}
+
+export function getReportHistory(month) {
+  return api(`/api/reports/history?month=${month}`, { fallback: { reports: [] } });
+}
+
+export function generateReport(month, kind) {
+  return api(`/api/reports/generate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ month, kind }),
+  });
 }

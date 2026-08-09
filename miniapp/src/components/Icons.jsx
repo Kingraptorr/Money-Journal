@@ -66,6 +66,14 @@ export function AddIcon(props) {
   );
 }
 
+export function SparkleIcon(props) {
+  return (
+    <Svg size={17} {...props}>
+      <path d="M12 3.5c.4 2.8 1 4.4 2.3 5.7 1.3 1.3 2.9 1.9 5.7 2.3-2.8.4-4.4 1-5.7 2.3-1.3 1.3-1.9 2.9-2.3 5.7-.4-2.8-1-4.4-2.3-5.7-1.3-1.3-2.9-1.9-5.7-2.3 2.8-.4 4.4-1 5.7-2.3 1.3-1.3 1.9-2.9 2.3-5.7z" />
+    </Svg>
+  );
+}
+
 export function SunIcon(props) {
   return (
     <Svg size={18} {...props}>

@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { Dashboard } from "./screens/Dashboard.jsx";
 import { History } from "./screens/History.jsx";
+import { Report } from "./screens/Report.jsx";
 import { Settings } from "./screens/Settings.jsx";
 import { Categories } from "./screens/Categories.jsx";
 import { RailNav } from "./components/RailNav.jsx";
 import { TabBar } from "./components/TabBar.jsx";
 import { AddIcon, ChartIcon, HistoryIcon, HomeIcon, SettingsIcon } from "./components/Icons.jsx";
-import { currentJalaliMonth, monthParam, shiftMonth } from "./utils/jalali.js";
+import { currentJalaliDate, currentJalaliMonth, monthParam, shiftMonth } from "./utils/jalali.js";
 import {
   createCategory,
   createExpense,
@@ -23,6 +24,7 @@ import { ACCENT_PRIMARY, applyTheme, getInitialTheme, persistTheme } from "./uti
 import { displayName, getTelegramUser } from "./utils/telegramUser.js";
 
 const WIDE_BREAKPOINT = 900;
+const TREND_MIN_DAY = 7;
 
 export default function App() {
   const [screen, setScreen] = useState("dashboard");
@@ -45,6 +47,10 @@ export default function App() {
 
   const currentMonthParam = useMemo(() => monthParam(month), [month]);
   const previousMonthParam = useMemo(() => monthParam(shiftMonth(month, -1)), [month]);
+  const today = currentJalaliDate();
+  const isCurrentMonth = month.jy === today.jy && month.jm === today.jm;
+  const trendDays = isCurrentMonth ? today.jd : undefined;
+  const trendEligible = !isCurrentMonth || today.jd >= TREND_MIN_DAY;
 
   useEffect(() => {
     applyTheme(theme);
@@ -69,7 +75,7 @@ export default function App() {
     try {
       const [summaryData, prevSummaryData, chartData, historyData, categoriesData] = await Promise.all([
         getSummary(currentMonthParam),
-        getSummary(previousMonthParam),
+        getSummary(previousMonthParam, trendDays),
         getChart(currentMonthParam),
         getHistory(currentMonthParam, selectedCategory),
         getCategories(),
@@ -162,15 +168,15 @@ export default function App() {
       label: "افزودن",
       icon: <AddIcon />,
       activeBg: "var(--tg-theme-button-color)",
-      activeColor: "#ffffff",
+      activeColor: "#111111",
       onClick: openAddSheet,
     },
     {
       key: "report",
       label: "گزارش",
       icon: <ChartIcon />,
-      ...railInactive,
-      onClick: () => {},
+      ...(screen === "report" ? railActive : railInactive),
+      onClick: () => setScreen("report"),
     },
     {
       key: "settings",
@@ -186,7 +192,7 @@ export default function App() {
     label: item.label,
     icon: item.icon,
     onClick: item.onClick,
-    color: item.key === "add" ? "#ffffff" : item.activeColor,
+    color: item.key === "add" ? "#111111" : item.activeColor,
     bg: item.key === "add" ? "var(--tg-theme-button-color)" : item.activeBg,
   }));
 
@@ -231,6 +237,7 @@ export default function App() {
               onNextMonth={() => setMonth((value) => shiftMonth(value, 1))}
               total={total}
               prevTotal={prevTotal}
+              trendEligible={trendEligible}
               chartData={chart}
               categories={categories}
               expenses={expenses}
@@ -264,6 +271,14 @@ export default function App() {
               isWide={isWide}
               avatarPhotoUrl={avatarPhotoUrl}
               avatarName={avatarName}
+            />
+          ) : null}
+
+          {!loading && !error && screen === "report" ? (
+            <Report
+              month={month}
+              onPrevMonth={() => setMonth((value) => shiftMonth(value, -1))}
+              onNextMonth={() => setMonth((value) => shiftMonth(value, 1))}
             />
           ) : null}
 
