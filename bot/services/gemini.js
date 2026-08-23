@@ -462,6 +462,7 @@ function normalizeExtraction(extraction, originalMessage) {
   }
 
   if (
+    extraction?.action !== "delete" &&
     (extraction?.action === "irrelevant" || extraction?.needs_clarification || extraction?.amount == null) &&
     buildFallbackExpense(originalMessage)
   ) {
