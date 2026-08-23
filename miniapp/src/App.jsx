@@ -4,6 +4,8 @@ import { History } from "./screens/History.jsx";
 import { Report } from "./screens/Report.jsx";
 import { Settings } from "./screens/Settings.jsx";
 import { Categories } from "./screens/Categories.jsx";
+import { Currency } from "./screens/Currency.jsx";
+import { Debts } from "./screens/Debts.jsx";
 import { RailNav } from "./components/RailNav.jsx";
 import { TabBar } from "./components/TabBar.jsx";
 import { AddIcon, ChartIcon, HistoryIcon, HomeIcon, SettingsIcon } from "./components/Icons.jsx";
@@ -15,6 +17,7 @@ import {
   deleteExpense,
   getCategories,
   getChart,
+  getDebtsSummary,
   getHistory,
   getSummary,
   updateCategory,
@@ -44,6 +47,13 @@ export default function App() {
   const [editingExpense, setEditingExpense] = useState(null);
   const [telegramUser] = useState(getTelegramUser);
   const [prevTotal, setPrevTotal] = useState(0);
+  const [debtsSummary, setDebtsSummary] = useState({
+    overdueCount: 0,
+    overdueTotal: 0,
+    dueSoonCount: 0,
+    dueSoonTotal: 0,
+    remainingBalance: 0,
+  });
 
   const currentMonthParam = useMemo(() => monthParam(month), [month]);
   const previousMonthParam = useMemo(() => monthParam(shiftMonth(month, -1)), [month]);
@@ -73,18 +83,22 @@ export default function App() {
     setLoading(true);
     setError(null);
     try {
-      const [summaryData, prevSummaryData, chartData, historyData, categoriesData] = await Promise.all([
+      const [summaryData, prevSummaryData, chartData, historyData, categoriesData, debtsSummaryData] = await Promise.all([
         getSummary(currentMonthParam),
         getSummary(previousMonthParam, trendDays),
         getChart(currentMonthParam),
         getHistory(currentMonthParam, selectedCategory),
         getCategories(),
+        getDebtsSummary(),
       ]);
       setSummary(summaryData ?? { total: 0 });
       setPrevTotal(Number(prevSummaryData?.total ?? 0));
       setChart(chartData?.data ?? []);
       setExpenses(historyData?.expenses ?? []);
       setCategories(categoriesData?.categories ?? []);
+      setDebtsSummary(
+        debtsSummaryData ?? { overdueCount: 0, overdueTotal: 0, dueSoonCount: 0, dueSoonTotal: 0, remainingBalance: 0 },
+      );
     } catch (loadError) {
       setError(loadError.message || "api_error");
     } finally {
@@ -248,7 +262,18 @@ export default function App() {
               avatarPhotoUrl={avatarPhotoUrl}
               avatarName={avatarName}
               userFirstName={telegramUser?.firstName || avatarName}
+              onOpenCurrency={() => setScreen("currency")}
+              debtsSummary={debtsSummary}
+              onOpenDebts={() => setScreen("debts")}
             />
+          ) : null}
+
+          {!loading && !error && screen === "currency" ? (
+            <Currency onBack={() => setScreen("dashboard")} />
+          ) : null}
+
+          {!loading && !error && screen === "debts" ? (
+            <Debts onBack={() => setScreen("dashboard")} onRefreshSummary={loadData} />
           ) : null}
 
           {!loading && !error && screen === "history" ? (

@@ -168,6 +168,63 @@ export function BackIcon(props) {
   );
 }
 
+export function DollarIcon(props) {
+  return (
+    <Svg size={20} {...props}>
+      <path d="M12 2.5v19M16.5 7.2a4.2 4.2 0 0 0-4.2-3.1h-.8a3.6 3.6 0 0 0 0 7.2h1a3.6 3.6 0 0 1 0 7.2h-.8a4.2 4.2 0 0 1-4.2-3.1" />
+    </Svg>
+  );
+}
+
+export function RefreshIcon(props) {
+  return (
+    <Svg size={19} {...props}>
+      <path d="M4 11a8 8 0 0 1 14-5.3M20 5v5h-5" />
+      <path d="M20 13a8 8 0 0 1-14 5.3M4 19v-5h5" />
+    </Svg>
+  );
+}
+
+export function FilterIcon(props) {
+  return (
+    <Svg size={15} {...props}>
+      <path d="M4 6h16M7 12h10M10 18h4" />
+    </Svg>
+  );
+}
+
+export function ChevronDownIcon(props) {
+  return (
+    <Svg size={13} {...props}>
+      <path d="M6 9l6 6 6-6" />
+    </Svg>
+  );
+}
+
+export function CheckIcon(props) {
+  return (
+    <Svg size={11} {...props}>
+      <path d="M5 12l4.5 4.5L19 7" />
+    </Svg>
+  );
+}
+
+export function TrendUpIcon(props) {
+  return (
+    <Svg size={13} {...props}>
+      <path d="M12 19V5M6 11l6-6 6 6" />
+    </Svg>
+  );
+}
+
+export function TrendDownIcon(props) {
+  return (
+    <Svg size={13} {...props}>
+      <path d="M12 5v14M6 13l6 6 6-6" />
+    </Svg>
+  );
+}
+
 export const CATEGORY_ICON_COMPONENTS = {
   food_dining(props) {
     return (

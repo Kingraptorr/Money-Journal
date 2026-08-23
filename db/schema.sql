@@ -55,3 +55,43 @@ CREATE TABLE IF NOT EXISTS ai_reports (
 
 CREATE INDEX IF NOT EXISTS idx_ai_reports_user_created ON ai_reports(user_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_ai_reports_user_month ON ai_reports(user_id, month, created_at);
+
+CREATE TABLE IF NOT EXISTS currency_rates (
+  code TEXT PRIMARY KEY,
+  name_fa TEXT NOT NULL,
+  category TEXT NOT NULL CHECK (category IN ('fiat', 'gold', 'crypto')),
+  sell NUMERIC(18, 2),
+  buy NUMERIC(18, 2),
+  change NUMERIC(18, 2),
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  updated_at TIMESTAMPTZ
+);
+
+CREATE TABLE IF NOT EXISTS debts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id BIGINT REFERENCES users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  total_amount NUMERIC(14, 2) NOT NULL,
+  currency TEXT NOT NULL DEFAULT 'IRT',
+  installment_count INTEGER NOT NULL,
+  start_date DATE NOT NULL,
+  note TEXT,
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'completed', 'cancelled')),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  deleted_at TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_debts_user_status ON debts(user_id, status);
+
+CREATE TABLE IF NOT EXISTS debt_installments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  debt_id UUID REFERENCES debts(id) ON DELETE CASCADE,
+  seq INTEGER NOT NULL,
+  due_date DATE NOT NULL,
+  amount NUMERIC(14, 2) NOT NULL,
+  paid_at TIMESTAMPTZ,
+  UNIQUE (debt_id, seq)
+);
+
+CREATE INDEX IF NOT EXISTS idx_debt_installments_debt ON debt_installments(debt_id);
+CREATE INDEX IF NOT EXISTS idx_debt_installments_due ON debt_installments(due_date) WHERE paid_at IS NULL;

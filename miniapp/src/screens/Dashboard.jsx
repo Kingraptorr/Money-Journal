@@ -2,6 +2,7 @@ import { CategoryChart } from "../components/CategoryChart.jsx";
 import { ExpenseRow } from "../components/ExpenseRow.jsx";
 import { MonthNav } from "../components/MonthNav.jsx";
 import { ScreenHeader } from "../components/ScreenHeader.jsx";
+import { DollarIcon } from "../components/Icons.jsx";
 
 const cardStyle = {
   background: "var(--tg-theme-secondary-bg-color)",
@@ -36,6 +37,9 @@ export function Dashboard({
   avatarPhotoUrl,
   avatarName,
   userFirstName,
+  onOpenCurrency,
+  debtsSummary,
+  onOpenDebts,
 }) {
   const visibleExpenses = selectedCategory
     ? expenses.filter((expense) => expense.category === selectedCategory)
@@ -51,6 +55,17 @@ export function Dashboard({
         isWide={isWide}
         avatarPhotoUrl={avatarPhotoUrl}
         avatarName={avatarName}
+        action={
+          <button
+            type="button"
+            onClick={onOpenCurrency}
+            aria-label="نرخ ارز و طلا"
+            className="flex h-[42px] w-[42px] items-center justify-center rounded-full text-tg-text"
+            style={{ background: "var(--app-subtle-bg)" }}
+          >
+            <DollarIcon />
+          </button>
+        }
       />
 
       <MonthNav month={month} onPrev={onPrevMonth} onNext={onNextMonth} />
@@ -77,6 +92,37 @@ export function Dashboard({
           <span>{trend.icon}</span>
           <span>{trend.text}</span>
         </div>
+      </section>
+
+      <section className="glass-card rounded-3xl p-4" style={cardStyle} role="button" onClick={onOpenDebts}>
+        <div className="mb-2 flex items-center justify-between">
+          <span className="text-sm font-semibold text-tg-text">بدهی و قرض</span>
+          <button
+            type="button"
+            className="text-sm font-medium text-tg-link"
+            onClick={(event) => {
+              event.stopPropagation();
+              onOpenDebts();
+            }}
+          >
+            مدیریت
+          </button>
+        </div>
+        {debtsSummary.overdueCount > 0 ? (
+          <div className="text-sm font-bold" style={{ color: "var(--tg-theme-destructive-text-color)" }}>
+            {debtsSummary.overdueCount.toLocaleString("fa-IR")} قسط عقب‌افتاده · {debtsSummary.overdueTotal.toLocaleString("fa-IR")} تومان
+          </div>
+        ) : null}
+        {debtsSummary.dueSoonCount > 0 ? (
+          <div className="text-sm text-tg-text">
+            {debtsSummary.dueSoonCount.toLocaleString("fa-IR")} قسط تا ۷ روز آینده · {debtsSummary.dueSoonTotal.toLocaleString("fa-IR")} تومان
+          </div>
+        ) : null}
+        {debtsSummary.remainingBalance > 0 ? (
+          <div className="mt-1 text-xs text-tg-hint">مانده کل: {debtsSummary.remainingBalance.toLocaleString("fa-IR")} تومان</div>
+        ) : (
+          <div className="py-2 text-center text-sm text-tg-hint">بدهی فعالی ثبت نکردی.</div>
+        )}
       </section>
 
       <section className="glass-card rounded-3xl p-4" style={cardStyle}>

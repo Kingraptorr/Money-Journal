@@ -6,6 +6,7 @@ import { handleTextMessage } from "./handlers/message.js";
 import { handleVoiceMessage } from "./handlers/voice.js";
 import { handleCallback } from "./handlers/callback.js";
 import { query } from "../db/index.js";
+import { refreshCurrencyRates } from "./services/currencyRates.js";
 
 const bot = new Bot(process.env.TELEGRAM_BOT_TOKEN);
 
@@ -97,6 +98,23 @@ cron.schedule(
   },
   { timezone: "Asia/Tehran" },
 );
+
+cron.schedule(
+  "2,32 * * * *",
+  async () => {
+    try {
+      const count = await refreshCurrencyRates();
+      console.log(`Currency rates refreshed: ${count} entries`);
+    } catch (error) {
+      console.error("Currency rate refresh failed:", error.message);
+    }
+  },
+  { timezone: "Asia/Tehran" },
+);
+
+refreshCurrencyRates()
+  .then((count) => console.log(`Currency rates seeded on boot: ${count} entries`))
+  .catch((error) => console.error("Initial currency rate fetch failed:", error.message));
 
 bot.catch((err) => {
   console.error("Bot error:", err);

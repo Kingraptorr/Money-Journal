@@ -5,6 +5,8 @@ import { authRouter } from "./routes/auth.js";
 import { expensesRouter } from "./routes/expenses.js";
 import { categoriesRouter } from "./routes/categories.js";
 import { reportsRouter } from "./routes/reports.js";
+import { currencyRouter } from "./routes/currency.js";
+import { debtsRouter } from "./routes/debts.js";
 import { requireAuth } from "./middleware/auth.js";
 
 const app = express();
@@ -20,6 +22,8 @@ app.use("/api/auth", authRouter);
 app.use("/api/expenses", requireAuth, expensesRouter);
 app.use("/api/categories", requireAuth, categoriesRouter);
 app.use("/api/reports", requireAuth, reportsRouter);
+app.use("/api/currency", requireAuth, currencyRouter);
+app.use("/api/debts", requireAuth, debtsRouter);
 
 app.use((error, _req, res, _next) => {
   console.error(error);

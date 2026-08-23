@@ -62,6 +62,11 @@ export function getHistory(month, category) {
   return api(`/api/expenses/history?month=${month}${categoryQuery}`, { fallback: { expenses: [] } });
 }
 
+export function searchExpenses(q, category) {
+  const categoryQuery = category ? `&category=${category}` : "";
+  return api(`/api/expenses/search?q=${encodeURIComponent(q)}${categoryQuery}`, { fallback: { expenses: [] } });
+}
+
 export function deleteExpense(id) {
   return api(`/api/expenses/${id}`, { method: "DELETE" });
 }
@@ -121,5 +126,51 @@ export function generateReport(month, kind) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ month, kind }),
+  });
+}
+
+export function getCurrencyRates() {
+  return api(`/api/currency/rates`, { fallback: { rates: [], updatedAt: null } });
+}
+
+export function getDebts(status = "active") {
+  return api(`/api/debts?status=${status}`, { fallback: { debts: [] } });
+}
+
+export function getDebt(id) {
+  return api(`/api/debts/${id}`, { fallback: { debt: null } });
+}
+
+export function createDebt(debt) {
+  return api(`/api/debts`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(debt),
+  });
+}
+
+export function updateDebt(id, debt) {
+  return api(`/api/debts/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(debt),
+  });
+}
+
+export function deleteDebt(id) {
+  return api(`/api/debts/${id}`, { method: "DELETE" });
+}
+
+export function payInstallment(debtId, seq) {
+  return api(`/api/debts/${debtId}/installments/${seq}/pay`, { method: "POST" });
+}
+
+export function unpayInstallment(debtId, seq) {
+  return api(`/api/debts/${debtId}/installments/${seq}/unpay`, { method: "POST" });
+}
+
+export function getDebtsSummary() {
+  return api(`/api/debts/summary`, {
+    fallback: { overdueCount: 0, overdueTotal: 0, dueSoonCount: 0, dueSoonTotal: 0, remainingBalance: 0 },
   });
 }
