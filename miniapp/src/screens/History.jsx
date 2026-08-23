@@ -1,10 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { CategoryIcon, CloseIcon, EditIcon, EmptyIcon, SearchIcon, TrashIcon } from "../components/Icons.jsx";
 import { JalaliDatePicker } from "../components/JalaliDatePicker.jsx";
 import { MonthNav } from "../components/MonthNav.jsx";
 import { ScreenHeader } from "../components/ScreenHeader.jsx";
 import { formatDayLabel } from "../utils/jalali.js";
+import { searchExpenses } from "../utils/api.js";
 
 function toPersianDigits(value) {
   return String(value ?? "").replace(/\d/g, (digit) => "۰۱۲۳۴۵۶۷۸۹"[Number(digit)]);
@@ -163,12 +164,34 @@ export function History({
 }) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchText, setSearchText] = useState("");
+  const [searchScope, setSearchScope] = useState("current");
+  const [allMonthsResults, setAllMonthsResults] = useState([]);
+  const [allMonthsLoading, setAllMonthsLoading] = useState(false);
+
+  useEffect(() => {
+    if (!searchOpen || searchScope !== "all") return;
+    const q = searchText.trim();
+    if (!q) {
+      setAllMonthsResults([]);
+      return;
+    }
+    setAllMonthsLoading(true);
+    const handle = setTimeout(() => {
+      searchExpenses(q, selectedCategory)
+        .then((data) => setAllMonthsResults(data?.expenses ?? []))
+        .finally(() => setAllMonthsLoading(false));
+    }, 300);
+    return () => clearTimeout(handle);
+  }, [searchText, searchScope, searchOpen, selectedCategory]);
+
+  const searching = searchOpen && Boolean(searchText.trim());
 
   const filtered = useMemo(() => {
-    const q = searchText.trim().toLowerCase();
+    const q = searchText.trim();
     if (!q) return expenses;
-    return expenses.filter((expense) => (expense.note || expense.merchant || "").toLowerCase().includes(q));
-  }, [expenses, searchText]);
+    if (searchScope === "all") return allMonthsResults;
+    return expenses.filter((expense) => (expense.note || expense.merchant || "").toLowerCase().includes(q.toLowerCase()));
+  }, [expenses, searchText, searchScope, allMonthsResults]);
 
   const dayGroups = useMemo(() => {
     const map = new Map();
@@ -202,7 +225,10 @@ export function History({
             type="button"
             onClick={() => {
               setSearchOpen((value) => !value);
-              if (searchOpen) setSearchText("");
+              if (searchOpen) {
+                setSearchText("");
+                setSearchScope("current");
+              }
             }}
             aria-label="جستجو"
             className="flex h-[42px] w-[42px] items-center justify-center rounded-full text-tg-text"
@@ -235,6 +261,15 @@ export function History({
               <CloseIcon size={11} />
             </button>
           ) : null}
+          <button
+            type="button"
+            onClick={() => setSearchScope((value) => (value === "current" ? "all" : "current"))}
+            className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-pill px-3 py-1.5 text-[12px] font-bold"
+            style={{ background: "var(--app-subtle-bg)", color: "var(--tg-theme-button-color)" }}
+          >
+            {searchScope === "current" ? "این ماه" : "همه‌ی زمان‌ها"}
+            <span className="text-[9px]">▾</span>
+          </button>
         </div>
       ) : null}
 
@@ -297,7 +332,13 @@ export function History({
       </div>
 
       <div className="flex flex-col gap-3.5">
-        {dayGroups.map((group) => (
+        {searching && searchScope === "all" && allMonthsLoading ? (
+          <div className="flex flex-col items-center gap-3 py-14 text-sm text-tg-hint">
+            <span className="h-6 w-6 animate-spin rounded-full border-2 border-tg-hint border-opacity-20 border-t-tg-link" />
+            در حال جستجو در همه‌ی ماه‌ها...
+          </div>
+        ) : (
+          dayGroups.map((group) => (
           <div key={group.isoDate} className="glass-card rounded-[20px] p-4" style={cardStyle}>
             <div
               className="mb-2.5 flex items-baseline justify-between border-b pb-2.5"
@@ -360,9 +401,10 @@ export function History({
               })}
             </div>
           </div>
-        ))}
+          ))
+        )}
 
-        {!dayGroups.length ? (
+        {!allMonthsLoading && !dayGroups.length ? (
           <div className="flex flex-col items-center gap-2.5 py-14 text-center text-[13.5px] text-tg-hint">
             <EmptyIcon />
             چیزی با این فیلتر پیدا نشد.

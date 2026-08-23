@@ -118,6 +118,35 @@ expensesRouter.get("/summary", async (req, res, next) => {
   }
 });
 
+expensesRouter.get("/search", async (req, res, next) => {
+  try {
+    const q = String(req.query.q ?? "").trim();
+    if (!q) {
+      res.json({ expenses: [] });
+      return;
+    }
+
+    const category = req.query.category;
+    const params = [req.user.id, `%${q}%`];
+    const categoryClause = category ? "AND category = $3" : "";
+    if (category) params.push(category);
+
+    const result = await query(
+      `SELECT id, amount, currency, category, merchant, note, expense_date, created_at
+       FROM expenses
+       WHERE user_id = $1 AND deleted_at IS NULL
+         AND (note ILIKE $2 OR merchant ILIKE $2)
+         ${categoryClause}
+       ORDER BY expense_date DESC, created_at DESC
+       LIMIT 300`,
+      params,
+    );
+    res.json({ expenses: result.rows.map(normalizeExpense) });
+  } catch (error) {
+    next(error);
+  }
+});
+
 expensesRouter.get("/history", async (req, res, next) => {
   try {
     const { start, end } = jalaliMonthRange(req.query.month);
