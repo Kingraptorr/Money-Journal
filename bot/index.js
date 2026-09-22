@@ -59,6 +59,22 @@ if (process.env.MINI_APP_URL) {
   });
 }
 
+bot.use(async (ctx, next) => {
+  const receivedAt = Date.now();
+  const sentAt = ctx.message?.date ? ctx.message.date * 1000 : null;
+  const kind = ctx.message?.voice ? "voice" : ctx.message?.text ? "text" : ctx.callbackQuery ? "callback" : ctx.updateType;
+
+  await next();
+
+  const processingMs = Date.now() - receivedAt;
+  const deliveryLagMs = sentAt ? receivedAt - sentAt : null;
+  console.log(
+    `[timing] user=${ctx.from?.id ?? "?"} type=${kind}` +
+      (deliveryLagMs !== null ? ` deliveryLagMs=${deliveryLagMs}` : "") +
+      ` processingMs=${processingMs}`,
+  );
+});
+
 bot.command("start", handleStart);
 bot.command("dashboard", handleDashboard);
 bot.on("message:text", handleTextMessage);
