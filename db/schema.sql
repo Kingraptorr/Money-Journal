@@ -95,3 +95,14 @@ CREATE TABLE IF NOT EXISTS debt_installments (
 
 CREATE INDEX IF NOT EXISTS idx_debt_installments_debt ON debt_installments(debt_id);
 CREATE INDEX IF NOT EXISTS idx_debt_installments_due ON debt_installments(due_date) WHERE paid_at IS NULL;
+
+CREATE TABLE IF NOT EXISTS debt_insights (
+  user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  overdue_count INTEGER NOT NULL,
+  overdue_total NUMERIC(14, 2) NOT NULL,
+  due_soon_count INTEGER NOT NULL,
+  due_soon_total NUMERIC(14, 2) NOT NULL,
+  remaining_balance NUMERIC(14, 2) NOT NULL,
+  sentence TEXT NOT NULL,
+  generated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);

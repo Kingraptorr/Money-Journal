@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { query } from "../../db/index.js";
-import { createDebtPlan, maybeFlipDebtStatus, validateDebtPlanInput } from "../services/debts.js";
+import { createDebtPlan, maybeFlipDebtStatus, updateDebtPlan, validateDebtPlanInput } from "../services/debts.js";
 import { debtsLogger } from "../services/debtsLogger.js";
+import { getOrGenerateDebtInsight } from "../services/debtInsights.js";
 
 export const debtsRouter = Router();
 
@@ -90,7 +91,8 @@ debtsRouter.get("/summary", async (req, res, next) => {
 
     const summary = { overdueCount, overdueTotal, dueSoonCount, dueSoonTotal, remainingBalance };
     debtsLogger.debug({ userId: req.user.id, ...summary }, "debt_summary_computed");
-    res.json(summary);
+    const insight = await getOrGenerateDebtInsight(req.user.id, summary);
+    res.json({ ...summary, insight });
   } catch (error) {
     debtsLogger.error({ err: error }, "debt_route_error");
     next(error);
@@ -156,25 +158,17 @@ debtsRouter.post("/", async (req, res, next) => {
 
 debtsRouter.patch("/:id", async (req, res, next) => {
   try {
-    const name = String(req.body.name ?? "").trim();
-    if (!name) {
-      res.status(400).json({ error: "invalid_name" });
-      return;
-    }
-    const note = req.body.note ? String(req.body.note).trim() : null;
-
-    const result = await query(
-      `UPDATE debts SET name = $1, note = $2
-       WHERE id = $3 AND user_id = $4 AND deleted_at IS NULL
-       RETURNING id, name, note`,
-      [name, note, req.params.id, req.user.id],
-    );
-    if (!result.rowCount) {
+    await updateDebtPlan(req.user.id, req.params.id, req.body);
+    res.json({ ok: true });
+  } catch (error) {
+    if (error.status === 404) {
       res.status(404).json({ error: "not_found" });
       return;
     }
-    res.json({ debt: result.rows[0] });
-  } catch (error) {
+    if (error.status === 400) {
+      res.status(400).json({ error: error.message });
+      return;
+    }
     debtsLogger.error({ err: error }, "debt_route_error");
     next(error);
   }

@@ -53,6 +53,7 @@ export default function App() {
     dueSoonCount: 0,
     dueSoonTotal: 0,
     remainingBalance: 0,
+    insight: null,
   });
 
   const currentMonthParam = useMemo(() => monthParam(month), [month]);
@@ -97,7 +98,14 @@ export default function App() {
       setExpenses(historyData?.expenses ?? []);
       setCategories(categoriesData?.categories ?? []);
       setDebtsSummary(
-        debtsSummaryData ?? { overdueCount: 0, overdueTotal: 0, dueSoonCount: 0, dueSoonTotal: 0, remainingBalance: 0 },
+        debtsSummaryData ?? {
+          overdueCount: 0,
+          overdueTotal: 0,
+          dueSoonCount: 0,
+          dueSoonTotal: 0,
+          remainingBalance: 0,
+          insight: null,
+        },
       );
     } catch (loadError) {
       setError(loadError.message || "api_error");
@@ -273,7 +281,7 @@ export default function App() {
           ) : null}
 
           {!loading && !error && screen === "debts" ? (
-            <Debts onBack={() => setScreen("dashboard")} onRefreshSummary={loadData} />
+            <Debts onBack={() => setScreen("dashboard")} onRefreshSummary={loadData} debtsSummary={debtsSummary} />
           ) : null}
 
           {!loading && !error && screen === "history" ? (

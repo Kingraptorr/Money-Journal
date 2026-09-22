@@ -1,4 +1,4 @@
-import { query } from "../../db/index.js";
+import { pool, query } from "../../db/index.js";
 import { addJalaliMonths } from "../utils/jalaliDate.js";
 import { debtsLogger } from "./debtsLogger.js";
 
@@ -77,6 +77,97 @@ export async function createDebtPlan(userId, { name, total_amount, currency, ins
     "debt_plan_created",
   );
   return { ...debt, installments };
+}
+
+export async function updateDebtPlan(userId, debtId, patch) {
+  const debtResult = await query(`SELECT * FROM debts WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL`, [
+    debtId,
+    userId,
+  ]);
+  if (!debtResult.rowCount) {
+    const error = new Error("not_found");
+    error.status = 404;
+    throw error;
+  }
+  const debt = debtResult.rows[0];
+
+  const name = patch.name !== undefined ? String(patch.name ?? "").trim() : debt.name;
+  if (!name) {
+    const error = new Error("invalid_name");
+    error.status = 400;
+    throw error;
+  }
+  const note = patch.note !== undefined ? String(patch.note ?? "").trim() || null : debt.note;
+
+  const wantsStructuralChange =
+    patch.total_amount !== undefined || patch.installment_count !== undefined || patch.start_date !== undefined;
+
+  if (!wantsStructuralChange) {
+    await query(`UPDATE debts SET name = $1, note = $2 WHERE id = $3`, [name, note, debtId]);
+    debtsLogger.info({ userId, debtId }, "debt_plan_updated");
+    return;
+  }
+
+  const paidResult = await query(
+    `SELECT COUNT(*) FILTER (WHERE paid_at IS NOT NULL) AS paid FROM debt_installments WHERE debt_id = $1`,
+    [debtId],
+  );
+  if (Number(paidResult.rows[0].paid) > 0) {
+    debtsLogger.warn({ userId, debtId }, "debt_update_blocked_paid_installments");
+    const error = new Error("debt_has_paid_installments");
+    error.status = 400;
+    throw error;
+  }
+
+  const total_amount = patch.total_amount !== undefined ? Number(patch.total_amount) : Number(debt.total_amount);
+  const installment_count =
+    patch.installment_count !== undefined ? Number(patch.installment_count) : debt.installment_count;
+  const start_date = patch.start_date !== undefined ? patch.start_date : toIsoDate(debt.start_date);
+
+  const errors = validateDebtPlanInput({ name, total_amount, installment_count, start_date });
+  if (errors.length) {
+    debtsLogger.warn({ userId, debtId, errors }, "debt_update_validation_rejected");
+    const error = new Error(errors[0]);
+    error.status = 400;
+    throw error;
+  }
+
+  const installments = computeInstallments({ total_amount, installment_count, start_date });
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query(
+      `UPDATE debts SET name = $1, note = $2, total_amount = $3, installment_count = $4, start_date = $5
+       WHERE id = $6`,
+      [name, note, total_amount, installment_count, start_date, debtId],
+    );
+    await client.query(`DELETE FROM debt_installments WHERE debt_id = $1`, [debtId]);
+
+    const values = [];
+    const params = [];
+    installments.forEach((inst, index) => {
+      const offset = index * 4;
+      values.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4})`);
+      params.push(debtId, inst.seq, inst.due_date, inst.amount);
+    });
+    await client.query(
+      `INSERT INTO debt_installments (debt_id, seq, due_date, amount) VALUES ${values.join(", ")}`,
+      params,
+    );
+
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+
+  debtsLogger.info(
+    { userId, debtId, totalAmount: total_amount, installmentCount: installment_count },
+    "debt_plan_updated",
+  );
 }
 
 export async function maybeFlipDebtStatus(debtId) {

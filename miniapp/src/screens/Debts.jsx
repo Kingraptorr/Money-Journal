@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { AddIcon, BackIcon, CheckIcon, TrashIcon } from "../components/Icons.jsx";
+import { AddIcon, BackIcon, CheckIcon, EditIcon, TrashIcon } from "../components/Icons.jsx";
 import { JalaliDatePicker } from "../components/JalaliDatePicker.jsx";
 import { formatJalali } from "../utils/jalali.js";
-import { createDebt, deleteDebt, getDebt, getDebts, payInstallment, unpayInstallment } from "../utils/api.js";
+import { createDebt, deleteDebt, getDebt, getDebts, payInstallment, unpayInstallment, updateDebt } from "../utils/api.js";
 
 function toPersianDigits(value) {
   return String(value ?? "").replace(/\d/g, (digit) => "۰۱۲۳۴۵۶۷۸۹"[Number(digit)]);
@@ -133,10 +133,132 @@ function CreateDebtSheet({ onClose, onSave }) {
   );
 }
 
+function EditDebtSheet({ plan, onClose, onSave }) {
+  const [name, setName] = useState(plan.name);
+  const [totalAmount, setTotalAmount] = useState(String(Math.round(Number(plan.total_amount))));
+  const [installmentCount, setInstallmentCount] = useState(plan.installment_count);
+  const [startDate, setStartDate] = useState(plan.start_date);
+  const [note, setNote] = useState(plan.note ?? "");
+  const [saving, setSaving] = useState(false);
+
+  const locked = plan.paidCount > 0;
+  const numericAmount = Number(normalizeDigits(totalAmount));
+  const canSave =
+    Boolean(name.trim()) && (locked || (Number.isFinite(numericAmount) && numericAmount > 0 && installmentCount > 0));
+
+  async function handleSave() {
+    if (!canSave) return;
+    setSaving(true);
+    try {
+      const payload = { name: name.trim(), note: note.trim() || null };
+      if (!locked) {
+        payload.total_amount = numericAmount;
+        payload.installment_count = installmentCount;
+        payload.start_date = startDate;
+      }
+      await onSave(payload);
+      onClose();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return createPortal(
+    <div onClick={onClose} className="fixed inset-0 z-30 flex items-end justify-center bg-black/40">
+      <div
+        onClick={(event) => event.stopPropagation()}
+        className="glass-card fade-in max-h-[88vh] w-full max-w-[480px] overflow-y-auto rounded-t-3xl px-5 pb-7 pt-[22px]"
+        style={cardStyle}
+      >
+        <div className="mx-auto mb-[18px] h-1 w-10 rounded-pill" style={{ background: "var(--app-track-bg)" }} />
+        <div className="mb-[18px] text-base font-extrabold text-tg-text">ویرایش طرح بدهی</div>
+
+        <div className="mb-1.5 text-xs font-semibold text-tg-hint">نام (وام‌دهنده یا کالا)</div>
+        <input
+          type="text"
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+          className="mb-3.5 w-full rounded-2xl border px-3.5 py-3 text-sm text-tg-text outline-none"
+          style={{ borderColor: "var(--app-glass-border)", background: "var(--app-subtle-bg)" }}
+        />
+
+        <div className="mb-1.5 text-xs font-semibold text-tg-hint">مبلغ کل (تومان)</div>
+        <input
+          type="text"
+          inputMode="numeric"
+          dir="ltr"
+          disabled={locked}
+          value={toPersianDigits(totalAmount)}
+          onChange={(event) => setTotalAmount(normalizeDigits(event.target.value).replace(/[^0-9]/g, ""))}
+          className="mb-3.5 w-full rounded-2xl border px-3.5 py-3 text-left text-base font-bold text-tg-text outline-none disabled:opacity-50"
+          style={{ borderColor: "var(--app-glass-border)", background: "var(--app-subtle-bg)" }}
+        />
+
+        <div className="mb-1.5 text-xs font-semibold text-tg-hint">تعداد قسط</div>
+        <div className="mb-3.5 flex items-center gap-3">
+          <button
+            type="button"
+            disabled={locked}
+            onClick={() => setInstallmentCount((value) => Math.max(1, value - 1))}
+            className="flex h-10 w-10 items-center justify-center rounded-2xl text-lg font-bold text-tg-text disabled:opacity-50"
+            style={{ background: "var(--app-subtle-bg)" }}
+          >
+            −
+          </button>
+          <div className="flex-1 text-center text-base font-bold text-tg-text">
+            {installmentCount.toLocaleString("fa-IR")}
+          </div>
+          <button
+            type="button"
+            disabled={locked}
+            onClick={() => setInstallmentCount((value) => value + 1)}
+            className="flex h-10 w-10 items-center justify-center rounded-2xl text-lg font-bold text-tg-text disabled:opacity-50"
+            style={{ background: "var(--app-subtle-bg)" }}
+          >
+            +
+          </button>
+        </div>
+
+        <div style={locked ? { opacity: 0.5, pointerEvents: "none" } : undefined}>
+          <JalaliDatePicker value={startDate} onChange={setStartDate} label="تاریخ شروع" />
+        </div>
+
+        {locked ? (
+          <div className="mb-3.5 mt-2 text-[11.5px] font-medium text-tg-hint">
+            چون قسطی از این طرح پرداخت شده، مبلغ کل، تعداد قسط و تاریخ شروع رو نمی‌شه تغییر داد.
+          </div>
+        ) : null}
+
+        <div className="mb-1.5 mt-3.5 text-xs font-semibold text-tg-hint">توضیح (اختیاری)</div>
+        <input
+          type="text"
+          value={note}
+          onChange={(event) => setNote(event.target.value)}
+          placeholder="یادداشت اختیاری"
+          className="mb-[22px] w-full rounded-2xl border px-3.5 py-3 text-sm text-tg-text outline-none"
+          style={{ borderColor: "var(--app-glass-border)", background: "var(--app-subtle-bg)" }}
+        />
+
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={!canSave || saving}
+          className="w-full rounded-2xl py-3.5 text-[14.5px] font-bold text-white transition disabled:opacity-60"
+          style={{ background: "var(--tg-theme-button-color)" }}
+        >
+          {saving ? "..." : "ذخیره تغییرات"}
+        </button>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 function DebtDetail({ debtId, onBack, onChanged }) {
   const [plan, setPlan] = useState(null);
   const [loading, setLoading] = useState(true);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [showEditSheet, setShowEditSheet] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -172,6 +294,12 @@ function DebtDetail({ debtId, onBack, onChanged }) {
     onBack();
   }
 
+  async function handleEdit(payload) {
+    await updateDebt(debtId, payload);
+    await load();
+    onChanged();
+  }
+
   if (loading || !plan) {
     return (
       <div className="flex flex-col items-center gap-3 py-16 text-sm text-tg-hint">
@@ -186,22 +314,33 @@ function DebtDetail({ debtId, onBack, onChanged }) {
 
   return (
     <div className="fade-in flex flex-col gap-4">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <button
+            type="button"
+            onClick={onBack}
+            aria-label="بازگشت"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-tg-text"
+            style={{ background: "var(--app-subtle-bg)" }}
+          >
+            <BackIcon />
+          </button>
+          <div className="min-w-0">
+            <div className="truncate text-[19px] font-extrabold text-tg-text">{plan.name}</div>
+            <div className="mt-0.5 text-[11.5px] font-medium text-tg-hint">
+              {plan.paidCount.toLocaleString("fa-IR")} از {plan.installment_count.toLocaleString("fa-IR")} قسط پرداخت شده
+            </div>
+          </div>
+        </div>
         <button
           type="button"
-          onClick={onBack}
-          aria-label="بازگشت"
+          onClick={() => setShowEditSheet(true)}
+          aria-label="ویرایش طرح بدهی"
           className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-tg-text"
           style={{ background: "var(--app-subtle-bg)" }}
         >
-          <BackIcon />
+          <EditIcon />
         </button>
-        <div className="min-w-0">
-          <div className="truncate text-[19px] font-extrabold text-tg-text">{plan.name}</div>
-          <div className="mt-0.5 text-[11.5px] font-medium text-tg-hint">
-            {plan.paidCount.toLocaleString("fa-IR")} از {plan.installment_count.toLocaleString("fa-IR")} قسط پرداخت شده
-          </div>
-        </div>
       </div>
 
       <section className="glass-card rounded-3xl p-4" style={cardStyle}>
@@ -265,11 +404,15 @@ function DebtDetail({ debtId, onBack, onChanged }) {
         <TrashIcon />
         {confirmingDelete ? "مطمئنی؟ حذف کن" : "حذف طرح بدهی"}
       </button>
+
+      {showEditSheet ? (
+        <EditDebtSheet plan={plan} onClose={() => setShowEditSheet(false)} onSave={handleEdit} />
+      ) : null}
     </div>
   );
 }
 
-export function Debts({ onBack, onRefreshSummary }) {
+export function Debts({ onBack, onRefreshSummary, debtsSummary }) {
   const [status, setStatus] = useState("active");
   const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -341,6 +484,39 @@ export function Debts({ onBack, onRefreshSummary }) {
           </button>
         </div>
       </div>
+
+      {debtsSummary ? (
+        debtsSummary.remainingBalance > 0 ? (
+          <section
+            className="relative overflow-hidden rounded-3xl p-5 shadow-lg"
+            style={{ background: "var(--tg-theme-button-color)", boxShadow: "0 14px 28px -16px var(--tg-theme-button-color)" }}
+          >
+            <div className="pointer-events-none absolute -left-6 -top-10 h-32 w-32 rounded-full bg-white/10" />
+            <div className="pointer-events-none absolute -right-8 bottom-[-2.5rem] h-28 w-28 rounded-full bg-white/10" />
+            <div className="relative mb-2 text-sm font-medium" style={{ color: "var(--app-hero-subtext)" }}>
+              مانده کل
+            </div>
+            <div className="relative text-4xl font-extrabold leading-tight" style={{ color: "var(--app-hero-text)" }}>
+              {debtsSummary.remainingBalance.toLocaleString("fa-IR")}{" "}
+              <span className="text-lg font-medium" style={{ color: "var(--app-hero-subtext)" }}>
+                تومان
+              </span>
+            </div>
+            {debtsSummary.insight ? (
+              <div
+                className="relative mt-3 rounded-2xl px-3 py-2 text-[13px] leading-relaxed"
+                style={{ background: "var(--app-hero-chip-bg)", color: "var(--app-hero-text)" }}
+              >
+                {debtsSummary.insight}
+              </div>
+            ) : null}
+          </section>
+        ) : (
+          <section className="glass-card rounded-3xl p-4" style={cardStyle}>
+            <div className="py-2 text-center text-sm text-tg-hint">بدهی فعالی ثبت نکردی.</div>
+          </section>
+        )
+      ) : null}
 
       {loading ? (
         <div className="flex flex-col items-center gap-3 py-16 text-sm text-tg-hint">

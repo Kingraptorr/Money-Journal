@@ -97,3 +97,36 @@ ${formatCategoryLines(categories)}`;
   }
   return text;
 }
+
+const DEBT_INSIGHT_SYSTEM_PROMPT = `You are the AI financial-insight voice inside a Persian personal finance app called "AI Money Journal" (دفتر مالی من).
+You are shown a summary of a user's active debt/loan installments and asked to write exactly ONE short, warm, honest sentence in conversational Persian reacting to it.
+
+RULES:
+- Write only in Persian, exactly one sentence (no line breaks, no lists), at most one emoji if it truly fits.
+- Never invent a number, debt name, or detail that isn't in the data you were given.
+- Write amounts the way Iranians casually write Toman, e.g. "۲٬۵۰۰٬۰۰۰ تومان" or "حدود ۲.۵ میلیون تومان" when that reads more naturally.
+- Address the user directly and warmly (دوم شخص), like a friend who's good with money, not a corporate report.
+- If there are overdue installments, gently encourage settling them soon. If everything is on track, be encouraging instead. Stay grounded in exactly the numbers given.`;
+
+export async function generateDebtInsight({ overdueCount, overdueTotal, dueSoonCount, dueSoonTotal, remainingBalance }) {
+  const model = genAI.getGenerativeModel({
+    model: process.env.GEMINI_REPORT_MODEL || "gemini-3.6-flash",
+    systemInstruction: DEBT_INSIGHT_SYSTEM_PROMPT,
+    generationConfig: {
+      temperature: 0.6,
+      maxOutputTokens: 120,
+      thinkingConfig: { thinkingLevel: "minimal" },
+    },
+  });
+
+  const prompt = `عقب‌افتاده: ${overdueCount} قسط، ${Math.round(overdueTotal).toLocaleString("en-US")} تومان
+نزدیک (تا ۷ روز آینده): ${dueSoonCount} قسط، ${Math.round(dueSoonTotal).toLocaleString("en-US")} تومان
+مانده کل بدهی: ${Math.round(remainingBalance).toLocaleString("en-US")} تومان`;
+
+  const result = await generateWithRetry(model, prompt);
+  const text = extractAnswerText(result.response);
+  if (!text) {
+    console.error("Gemini debt insight response had no non-thought text:", JSON.stringify(result.response).slice(0, 1000));
+  }
+  return text;
+}

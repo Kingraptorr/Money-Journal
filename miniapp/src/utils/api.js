@@ -171,6 +171,6 @@ export function unpayInstallment(debtId, seq) {
 
 export function getDebtsSummary() {
   return api(`/api/debts/summary`, {
-    fallback: { overdueCount: 0, overdueTotal: 0, dueSoonCount: 0, dueSoonTotal: 0, remainingBalance: 0 },
+    fallback: { overdueCount: 0, overdueTotal: 0, dueSoonCount: 0, dueSoonTotal: 0, remainingBalance: 0, insight: null },
   });
 }
