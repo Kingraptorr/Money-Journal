@@ -7,6 +7,7 @@ import { handleVoiceMessage } from "./handlers/voice.js";
 import { handleCallback } from "./handlers/callback.js";
 import { query } from "../db/index.js";
 import { refreshCurrencyRates } from "./services/currencyRates.js";
+import { sendDebtReminders } from "./services/debtReminders.js";
 
 const bot = new Bot(process.env.TELEGRAM_BOT_TOKEN);
 
@@ -111,6 +112,19 @@ cron.schedule(
         return bot.api.sendMessage(user.id, pickRandom(messages));
       }),
     );
+  },
+  { timezone: "Asia/Tehran" },
+);
+
+cron.schedule(
+  "0 11 * * *",
+  async () => {
+    try {
+      const count = await sendDebtReminders(bot);
+      console.log(`Debt reminders sent to ${count} user(s)`);
+    } catch (error) {
+      console.error("Debt reminder run failed:", error.message);
+    }
   },
   { timezone: "Asia/Tehran" },
 );
