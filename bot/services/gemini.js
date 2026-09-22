@@ -450,7 +450,7 @@ function normalizeExtraction(extraction, originalMessage) {
     };
   }
 
-  if (extraction?.action === "log") {
+  if (extraction?.action === "log" && extraction.amount != null) {
     return {
       ...extraction,
       amount: normalizeTomanShorthandAmount(extraction.amount, originalMessage),

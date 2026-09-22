@@ -36,10 +36,13 @@ function expenseListLabel(expense, index) {
 }
 
 function meaningfulNameFromText(text) {
+  // \b is ASCII-word-boundary only in JS regex, so it never matches around Persian
+  // letters; these word lists use (^|\s)...(?=\s|$) lookarounds instead so the
+  // currency/verb words are actually stripped from Persian input.
   return String(text ?? "")
     .replace(/[۰-۹٠-٩\d.,٬]+/g, "")
-    .replace(/\b(تومن|تومان|ریال|هزار|میلیون|ملیون|دلار|یورو|پوند|لیر)\b/g, "")
-    .replace(/\b(دادم|خریدم|پرداخت کردم|خرج کردم|شد|بود)\b/g, "")
+    .replace(/(^|\s)(تومن|تومان|ریال|هزار|میلیون|ملیون|دلار|یورو|پوند|لیر)(?=\s|$)/g, "$1")
+    .replace(/(^|\s)(دادم|خریدم|پرداخت کردم|خرج کردم|شد|بود)(?=\s|$)/g, "$1")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -136,6 +139,56 @@ async function sendPendingConfirmation(ctx, pendingExpense) {
   });
 }
 
+async function processClarificationReply(ctx, rawInput, current) {
+  const pending = current.payload.expense;
+  // Sending the bare reply alone strips Gemini of the item context it needs to apply its
+  // usual casual-amount reasoning (e.g. a bare "489" should read as 489,000 Toman the same
+  // way "ناهار 489" would). Recomposing with the already-extracted item note reproduces that
+  // same single-message pattern instead of asking Gemini to interpret a number in isolation.
+  const composedText = pending.note ? `${pending.note} ${rawInput}` : rawInput;
+
+  let extraction;
+
+  try {
+    extraction = await extractExpense(composedText);
+  } catch (error) {
+    console.error("Clarification reply extraction failed:", error);
+    await ctx.reply("فعلاً نتونستم متن رو تحلیل کنم. لطفاً چند دقیقه دیگه دوباره امتحان کن.");
+    return;
+  }
+
+  if (extraction.action === "delete") {
+    clearUserState(ctx.from.id);
+    await handleDeleteIntent(ctx, extraction);
+    return;
+  }
+
+  if (extraction.action !== "log" || extraction.amount == null) {
+    const stillPending = {
+      ...pending,
+      category: extraction.category || pending.category,
+      merchant: extraction.merchant ?? pending.merchant,
+      date: extraction.date || pending.date,
+    };
+    setUserState(ctx.from.id, "awaiting_clarification", { expense: stillPending });
+    await ctx.reply(
+      extraction.needs_clarification && extraction.clarification_question
+        ? extraction.clarification_question
+        : "هنوز مبلغ رو متوجه نشدم. می‌شه فقط عدد مبلغ رو بفرستی؟",
+    );
+    return;
+  }
+
+  clearUserState(ctx.from.id);
+  const pendingExpense = {
+    ...extraction,
+    merchant: extraction.merchant ?? pending.merchant,
+    raw_input: `${pending.raw_input}\n${rawInput}`,
+    gemini_response: { original: pending.gemini_response, reply: extraction },
+  };
+  await sendPendingConfirmation(ctx, pendingExpense);
+}
+
 async function processEditedText(ctx, rawInput, current) {
   let extraction;
   const meaningfulName = meaningfulNameFromText(rawInput);
@@ -183,6 +236,11 @@ export async function processUserText(ctx, rawInput, options = {}) {
     return;
   }
 
+  if (current.state === "awaiting_clarification" && current.payload?.expense) {
+    await processClarificationReply(ctx, rawInput, current);
+    return;
+  }
+
   let extraction;
 
   try {
@@ -198,6 +256,19 @@ export async function processUserText(ctx, rawInput, options = {}) {
   }
 
   if (extraction.action === "irrelevant" || extraction.needs_clarification) {
+    const pendingExpense = {
+      action: "log",
+      amount: extraction.amount ?? null,
+      currency: extraction.currency || "IRT",
+      category: extraction.category || "other",
+      merchant: extraction.merchant ?? null,
+      date: extraction.date || new Date().toISOString().slice(0, 10),
+      note: extraction.note ?? null,
+      raw_input: rawInput,
+      gemini_response: extraction,
+    };
+    setUserState(ctx.from.id, "awaiting_clarification", { expense: pendingExpense });
+
     if (options.source === "voice") {
       const heard = String(rawInput ?? "").trim();
       await ctx.reply(
