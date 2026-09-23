@@ -213,6 +213,96 @@ function normalizeDigits(value) {
     .replace(/[٠-٩]/g, (digit) => String(ARABIC_DIGITS.indexOf(digit)));
 }
 
+const PERSIAN_MONTH_NAMES = [
+  "فروردین",
+  "اردیبهشت",
+  "خرداد",
+  "تیر",
+  "مرداد",
+  "شهریور",
+  "مهر",
+  "آبان",
+  "آذر",
+  "دی",
+  "بهمن",
+  "اسفند",
+];
+const PERSIAN_MONTH_PATTERN = PERSIAN_MONTH_NAMES.join("|");
+
+// Day-of-month words as spoken/typed casually in Persian ("بیست و شش شهریور"), covering
+// both the ordinal form ("بیستم", "یکم") and the bare cardinal form people often drop the
+// ordinal suffix from ("بیست", "سه"). Built programmatically to avoid missing a variant.
+const PERSIAN_DAY_UNITS_ORDINAL = ["", "یکم", "دوم", "سوم", "چهارم", "پنجم", "ششم", "هفتم", "هشتم", "نهم"];
+const PERSIAN_DAY_UNITS_CARDINAL = ["", "یک", "دو", "سه", "چهار", "پنج", "شش", "هفت", "هشت", "نه"];
+const PERSIAN_DAY_TEENS_ORDINAL = [
+  "دهم",
+  "یازدهم",
+  "دوازدهم",
+  "سیزدهم",
+  "چهاردهم",
+  "پانزدهم",
+  "شانزدهم",
+  "هفدهم",
+  "هجدهم",
+  "نوزدهم",
+];
+const PERSIAN_DAY_TEENS_CARDINAL = [
+  "ده",
+  "یازده",
+  "دوازده",
+  "سیزده",
+  "چهارده",
+  "پانزده",
+  "شانزده",
+  "هفده",
+  "هجده",
+  "نوزده",
+];
+
+function buildPersianDayWordMap() {
+  const map = new Map();
+  const add = (word, day) => {
+    if (word) map.set(word, day);
+  };
+
+  add("اول", 1);
+  for (let n = 1; n <= 9; n += 1) {
+    add(PERSIAN_DAY_UNITS_CARDINAL[n], n);
+    add(PERSIAN_DAY_UNITS_ORDINAL[n], n);
+  }
+  for (let n = 10; n <= 19; n += 1) {
+    add(PERSIAN_DAY_TEENS_CARDINAL[n - 10], n);
+    add(PERSIAN_DAY_TEENS_ORDINAL[n - 10], n);
+  }
+  add("بیست", 20);
+  add("بیستم", 20);
+  for (let n = 21; n <= 29; n += 1) {
+    const unit = n - 20;
+    add(`بیست و ${PERSIAN_DAY_UNITS_CARDINAL[unit]}`, n);
+    add(`بیست و ${PERSIAN_DAY_UNITS_ORDINAL[unit]}`, n);
+  }
+  add("سی", 30);
+  add("سی‌ام", 30);
+  add("سی ام", 30);
+  add(`سی و ${PERSIAN_DAY_UNITS_CARDINAL[1]}`, 31);
+  add(`سی و ${PERSIAN_DAY_UNITS_ORDINAL[1]}`, 31);
+
+  return map;
+}
+
+const PERSIAN_DAY_WORD_MAP = buildPersianDayWordMap();
+// Longest-phrase-first so e.g. "بیست و ششم" matches before the bare "بیست" alternative.
+const PERSIAN_DAY_WORD_PATTERN = [...PERSIAN_DAY_WORD_MAP.keys()].sort((a, b) => b.length - a.length).join("|");
+
+const WORD_DATE_REGEX = new RegExp(
+  `(?:^|[^\\p{L}])(${PERSIAN_DAY_WORD_PATTERN})\\s+(${PERSIAN_MONTH_PATTERN})(?:\\s+(13\\d{2}|14\\d{2}))?(?=$|[^\\p{L}\\d])`,
+  "u",
+);
+const WORD_DATE_STRIP_REGEX = new RegExp(
+  `(?:^|[^\\p{L}])(?:${PERSIAN_DAY_WORD_PATTERN})\\s+(?:${PERSIAN_MONTH_PATTERN})(?:\\s+(?:13\\d{2}|14\\d{2}))?(?=$|[^\\p{L}\\d])`,
+  "gu",
+);
+
 function extractJalaliDate(message) {
   const normalized = normalizeDigits(message);
   const numericDateMatch = normalized.match(/(?:^|[^\d])(13\d{2}|14\d{2})[/-](0?[1-9]|1[0-2])[/-](0?[1-9]|[12]\d|3[01])(?:$|[^\d])/);
@@ -228,29 +318,30 @@ function extractJalaliDate(message) {
     }
   }
 
-  const monthNames = [
-    "فروردین",
-    "اردیبهشت",
-    "خرداد",
-    "تیر",
-    "مرداد",
-    "شهریور",
-    "مهر",
-    "آبان",
-    "آذر",
-    "دی",
-    "بهمن",
-    "اسفند",
-  ];
-  const namedDateMatch = normalized.match(/(?:^|[^\d])([1-9]|[12]\d|3[01])\s+(فروردین|اردیبهشت|خرداد|تیر|مرداد|شهریور|مهر|آبان|آذر|دی|بهمن|اسفند)(?:\s+(13\d{2}|14\d{2}))?(?=$|[^\p{L}\d])/u);
+  const namedDateMatch = normalized.match(
+    new RegExp(`(?:^|[^\\d])([1-9]|[12]\\d|3[01])\\s+(${PERSIAN_MONTH_PATTERN})(?:\\s+(13\\d{2}|14\\d{2}))?(?=$|[^\\p{L}\\d])`, "u"),
+  );
 
   if (namedDateMatch) {
     const jd = Number(namedDateMatch[1]);
-    const jm = monthNames.indexOf(namedDateMatch[2]) + 1;
+    const jm = PERSIAN_MONTH_NAMES.indexOf(namedDateMatch[2]) + 1;
     const todayJalali = jalaali.toJalaali(tehranToday());
     const jy = Number(namedDateMatch[3] ?? todayJalali.jy);
 
     if (jalaali.isValidJalaaliDate(jy, jm, jd)) {
+      return toIsoDate(jalaali.toGregorian(jy, jm, jd));
+    }
+  }
+
+  const wordDateMatch = normalized.match(WORD_DATE_REGEX);
+
+  if (wordDateMatch) {
+    const jd = PERSIAN_DAY_WORD_MAP.get(wordDateMatch[1]);
+    const jm = PERSIAN_MONTH_NAMES.indexOf(wordDateMatch[2]) + 1;
+    const todayJalali = jalaali.toJalaali(tehranToday());
+    const jy = Number(wordDateMatch[3] ?? todayJalali.jy);
+
+    if (jd && jalaali.isValidJalaaliDate(jy, jm, jd)) {
       return toIsoDate(jalaali.toGregorian(jy, jm, jd));
     }
   }
@@ -261,7 +352,11 @@ function extractJalaliDate(message) {
 function removeJalaliDateFragments(message) {
   return normalizeDigits(message)
     .replace(/(?:^|[^\d])(13\d{2}|14\d{2})[/-](0?[1-9]|1[0-2])[/-](0?[1-9]|[12]\d|3[01])(?=$|[^\d])/g, " ")
-    .replace(/(?:^|[^\d])([1-9]|[12]\d|3[01])\s+(فروردین|اردیبهشت|خرداد|تیر|مرداد|شهریور|مهر|آبان|آذر|دی|بهمن|اسفند)(?:\s+(13\d{2}|14\d{2}))?(?=$|[^\p{L}\d])/gu, " ");
+    .replace(
+      new RegExp(`(?:^|[^\\d])([1-9]|[12]\\d|3[01])\\s+(${PERSIAN_MONTH_PATTERN})(?:\\s+(13\\d{2}|14\\d{2}))?(?=$|[^\\p{L}\\d])`, "gu"),
+      " ",
+    )
+    .replace(WORD_DATE_STRIP_REGEX, " ");
 }
 
 function cleanExpenseName(value) {
