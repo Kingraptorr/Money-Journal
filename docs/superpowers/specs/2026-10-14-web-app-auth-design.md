@@ -48,14 +48,21 @@ Backfill: one `telegram` identity row per existing user, `provider_user_id = use
 
 ## Linking
 
-- **Add email to a Telegram account:** email, verification code, set password.
-- **Connect Telegram to an email account:** the web app issues a `link_telegram` code; the user sends `/link <code>` to the bot.
-- **Has data** means at least one non-deleted expense or at least one debt. Default categories are ignored.
-- **Rule, performed in one transaction:**
-  - Only one side has data: that account survives. The other identity is moved onto it and the empty account row is deleted.
+Implemented in `db/linking.js`; all merging decisions happen in one transaction under row locks, and any doubt rolls back and changes nothing.
+
+- **Add email to a Telegram account:** `POST /api/auth/link/email` with email and password. No second account is involved, so nothing can be merged or lost. An already-registered email is refused. A security notice is sent to the account's Telegram chat.
+- **Connect Telegram to an email account:** the web app calls `POST /api/auth/link/telegram` and receives a 120-bit single-use token (10 minutes) as a deep link (`/start link_<token>`) or manual `/link <token>`. A 6-digit code was rejected here: anyone messaging the bot could guess an active code and attach their own Telegram account to a victim's email account.
+- **Explicit confirmation in the bot:** before anything changes, the bot shows the email address and a summary of what each side holds, with Confirm and Cancel buttons. This stops an attacker from sending someone a link that would attach the victim's Telegram data to the attacker's email account.
+- **"Has data" is strict.** An account counts as having data if it has any expense row (including soft-deleted), any debt, any AI report, any custom category, or any default category whose label or colour was edited. Only untouched default categories and usage counters count as empty.
+- **Survivor rules, in one transaction:**
+  - Only one side has data: that account survives and the other identity is moved onto it.
   - Neither side has data: the email account survives and the Telegram identity is moved onto it.
-  - Both sides have data: refuse with a "choose which account to keep" message. No data is moved.
-  - If the surviving account is not the one the user is logged into, all of the user's sessions are revoked and a new session for the surviving account is issued in the same response.
+  - Both sides have data: the link is refused and nothing is changed. The bot explains why. A "choose which account to keep" action is intentionally not implemented, because it would be destructive.
+  - The empty account row is deleted only after re-checking, inside the transaction, that it has no data. Today's bot usage count is merged into the survivor so linking cannot be used to reset the daily limit.
+- **Sessions:** when the Telegram account survives, the absorbed email account's web sessions are removed and the user logs in again with the same email and password (which now opens the Telegram account). Confirmation happens in the bot, so a new session cannot be issued in the same response.
+- **Other refusals:** a Telegram account that already has an email, an email account that already has Telegram, and expired or reused tokens.
+- **Abuse limits:** 5 token issues and 5 add-email attempts per account per 15 minutes; 8 link attempts per Telegram user per hour.
+- **Maintenance note:** when a table that references `users` is added, update `accountDataSummary` in `db/linking.js`.
 
 ## Sessions and security
 

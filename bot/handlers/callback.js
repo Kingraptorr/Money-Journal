@@ -1,6 +1,7 @@
 import { getUserState, clearUserState, setUserState } from "../services/state.js";
 import { query } from "../../db/index.js";
 import { handleWebLoginCallback } from "./webLogin.js";
+import { handleLinkCallback } from "./linking.js";
 
 export async function handleCallback(ctx) {
   const userId = ctx.from.id;
@@ -9,6 +10,11 @@ export async function handleCallback(ctx) {
 
   if (data.startsWith("weblogin:")) {
     await handleWebLoginCallback(ctx, data);
+    return;
+  }
+
+  if (data.startsWith("link:")) {
+    await handleLinkCallback(ctx, data);
     return;
   }
 

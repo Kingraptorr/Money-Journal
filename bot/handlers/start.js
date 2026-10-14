@@ -1,10 +1,15 @@
 import { InlineKeyboard } from "grammy";
 import { handleWebLoginStart } from "./webLogin.js";
+import { handleLinkToken } from "./linking.js";
 
 export async function handleStart(ctx) {
   const payload = String(ctx.match ?? "");
   if (/^web_[0-9a-f-]{36}$/i.test(payload)) {
     await handleWebLoginStart(ctx, payload.slice(4));
+    return;
+  }
+  if (/^link_[A-Za-z0-9_-]{20}$/.test(payload)) {
+    await handleLinkToken(ctx, payload.slice(5));
     return;
   }
 

@@ -4,6 +4,7 @@ import cors from "cors";
 import { authRouter } from "./routes/auth.js";
 import { emailAuthRouter } from "./routes/emailAuth.js";
 import { telegramLoginRouter } from "./routes/telegramLogin.js";
+import { linkRouter } from "./routes/link.js";
 import { purgeOldLoginArtifacts } from "../db/webLogin.js";
 import { expensesRouter } from "./routes/expenses.js";
 import { categoriesRouter } from "./routes/categories.js";
@@ -37,6 +38,7 @@ app.get("/health", (_req, res) => {
 app.use("/api/auth", authRouter);
 app.use("/api/auth", emailAuthRouter);
 app.use("/api/auth", telegramLoginRouter);
+app.use("/api/auth", linkRouter);
 app.use("/api/expenses", requireAuth, expensesRouter);
 app.use("/api/categories", requireAuth, categoriesRouter);
 app.use("/api/reports", requireAuth, reportsRouter);

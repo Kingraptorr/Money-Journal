@@ -6,6 +6,7 @@ import { handleTextMessage } from "./handlers/message.js";
 import { handleVoiceMessage } from "./handlers/voice.js";
 import { handleCallback } from "./handlers/callback.js";
 import { handleWebCode } from "./handlers/webLogin.js";
+import { handleLinkCommand } from "./handlers/linking.js";
 import { query } from "../db/index.js";
 import { resolveTelegramAccount } from "../db/accounts.js";
 import { refreshCurrencyRates } from "./services/currencyRates.js";
@@ -86,6 +87,7 @@ bot.use(async (ctx, next) => {
 bot.command("start", handleStart);
 bot.command("dashboard", handleDashboard);
 bot.command("web", handleWebCode);
+bot.command("link", handleLinkCommand);
 bot.on("message:text", handleTextMessage);
 bot.on("message:voice", handleVoiceMessage);
 bot.on("callback_query:data", handleCallback);

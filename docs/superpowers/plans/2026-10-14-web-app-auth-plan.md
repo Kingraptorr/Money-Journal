@@ -114,6 +114,8 @@ Files: new `db/linking.js`, `api/routes/link.js`; edit bot `/link <code>` handle
 - [ ] Telegram to email: `POST /api/auth/link/email` for a logged-in Telegram-only account; if the email is free, attach and set password (no verification).
 - [ ] After a link that changes the surviving account ID, revoke the user's sessions and issue a fresh one in the same response; the bot replies with a clear confirmation.
 
+Implementation notes (done): see the spec's Linking section for the final rules. Deviations from this task list: the link token is a 120-bit deep-link/`/link` token instead of a 6-digit code (guessable against any active code), the bot requires an explicit Confirm tap that shows the email and both data summaries, "has data" is stricter than first written, and a security notice is sent when an email is added. Phase 7 client contract: `POST /api/auth/link/telegram` returns `{token, botLink, expiresInSeconds}`; poll `GET /api/auth/me` for `hasTelegram`; after linking, a user whose Telegram account survived must log in again.
+
 Verify all four data combinations (neither, only email, only Telegram, both) including that no row is lost or duplicated, concurrent link attempts, linking a Telegram ID already tied to another email account (refused), and that the bot works for the linked account immediately afterward.
 
 ## Phase 7: Frontend web mode
