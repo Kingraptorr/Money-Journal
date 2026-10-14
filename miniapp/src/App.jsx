@@ -80,33 +80,33 @@ export default function App({ webAccount = null, onLogout = null }) {
     setTheme((current) => (current === "dark" ? "light" : "dark"));
   }
 
+  async function loadDebtsSummary() {
+    try {
+      const data = await getDebtsSummary();
+      if (data) setDebtsSummary(data);
+    } catch {
+      // keep whatever is already shown; the debts screen reloads its own data
+    }
+  }
+
   async function loadData() {
     setLoading(true);
     setError(null);
     try {
-      const [summaryData, prevSummaryData, chartData, historyData, categoriesData, debtsSummaryData] = await Promise.all([
+      // The debt summary is secondary (it may wait on AI), so it loads on its own and never blocks the screen.
+      loadDebtsSummary();
+      const [summaryData, prevSummaryData, chartData, historyData, categoriesData] = await Promise.all([
         getSummary(currentMonthParam),
         getSummary(previousMonthParam, trendDays),
         getChart(currentMonthParam),
         getHistory(currentMonthParam, selectedCategory),
         getCategories(),
-        getDebtsSummary(),
       ]);
       setSummary(summaryData ?? { total: 0 });
       setPrevTotal(Number(prevSummaryData?.total ?? 0));
       setChart(chartData?.data ?? []);
       setExpenses(historyData?.expenses ?? []);
       setCategories(categoriesData?.categories ?? []);
-      setDebtsSummary(
-        debtsSummaryData ?? {
-          overdueCount: 0,
-          overdueTotal: 0,
-          dueSoonCount: 0,
-          dueSoonTotal: 0,
-          remainingBalance: 0,
-          insight: null,
-        },
-      );
     } catch (loadError) {
       setError(loadError.message || "api_error");
     } finally {

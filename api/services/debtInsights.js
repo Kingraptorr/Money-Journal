@@ -13,24 +13,17 @@ function matchesCache(row, summary) {
   );
 }
 
-export async function getOrGenerateDebtInsight(userId, summary) {
-  if (summary.remainingBalance <= 0) return null;
+// Gemini is slow and sometimes unavailable (503), and this runs on the app's initial load, so the
+// request never waits long for it: it returns the last stored sentence (or null) and lets the
+// generation finish in the background for the next load.
+const WAIT_FOR_GENERATION_MS = 2500;
+const FAILURE_COOLDOWN_MS = 10 * 60_000;
+const inFlight = new Map();
+const lastFailureAt = new Map();
 
-  const cached = await query(`SELECT * FROM debt_insights WHERE user_id = $1`, [userId]);
-  const row = cached.rows[0];
-
-  if (matchesCache(row, summary)) {
-    return row.sentence;
-  }
-
-  let sentence;
-  try {
-    sentence = await generateDebtInsight(summary);
-    if (!sentence) throw new Error("empty_debt_insight_response");
-  } catch (error) {
-    debtsLogger.error({ err: error, userId }, "debt_insight_generation_failed");
-    return row?.sentence ?? null;
-  }
+async function generateAndStore(userId, summary) {
+  const sentence = await generateDebtInsight(summary);
+  if (!sentence) throw new Error("empty_debt_insight_response");
 
   await query(
     `INSERT INTO debt_insights (user_id, overdue_count, overdue_total, due_soon_count, due_soon_total, remaining_balance, sentence, generated_at)
@@ -53,6 +46,49 @@ export async function getOrGenerateDebtInsight(userId, summary) {
       sentence,
     ],
   );
-
   return sentence;
+}
+
+function startGeneration(userId, summary) {
+  const key = String(userId);
+
+  const job = generateAndStore(userId, summary)
+    .then((sentence) => {
+      lastFailureAt.delete(key);
+      return sentence;
+    })
+    .catch((error) => {
+      lastFailureAt.set(key, Date.now());
+      debtsLogger.error({ err: error, userId }, "debt_insight_generation_failed");
+      return null;
+    })
+    .finally(() => inFlight.delete(key));
+
+  inFlight.set(key, job);
+  return job;
+}
+
+export async function getOrGenerateDebtInsight(userId, summary) {
+  if (summary.remainingBalance <= 0) return null;
+
+  const cached = await query(`SELECT * FROM debt_insights WHERE user_id = $1`, [userId]);
+  const row = cached.rows[0];
+
+  if (matchesCache(row, summary)) {
+    return row.sentence;
+  }
+
+  const stale = row?.sentence ?? null;
+  const key = String(userId);
+  const failedAt = lastFailureAt.get(key);
+  // Someone is already generating it, or it failed recently: don't wait, don't pile on.
+  if (inFlight.has(key)) return stale;
+  if (failedAt && Date.now() - failedAt < FAILURE_COOLDOWN_MS) return stale;
+
+  const job = startGeneration(userId, summary);
+  const waited = await Promise.race([
+    job,
+    new Promise((resolve) => setTimeout(() => resolve(null), WAIT_FOR_GENERATION_MS)),
+  ]);
+  return waited ?? stale;
 }
