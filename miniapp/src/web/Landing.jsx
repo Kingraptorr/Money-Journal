@@ -81,8 +81,8 @@ export function Landing() {
       <div style={{ position: "sticky", top: 0, zIndex: 10, display: "flex", justifyContent: "center", padding: "14px 16px" }}>
         <div style={{ ...inner, ...glass, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, borderRadius: 20, padding: "10px 12px 10px 10px", boxShadow: c.softShadow }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ width: 38, height: 38, borderRadius: 12, background: BRAND.green, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 16 }}>م</span>
-            <span style={{ fontWeight: 800, fontSize: 16 }}>دفتر خرج</span>
+            <img src="/icon-192.png" alt="" width={38} height={38} style={{ width: 38, height: 38, borderRadius: "50%", display: "block" }} />
+            <span dir="ltr" style={{ fontWeight: 800, fontSize: 16 }}>Ham-Kharj</span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             {wide ? (
@@ -192,7 +192,7 @@ export function Landing() {
 
       <div style={{ ...section, padding: "10px 20px 32px" }}>
         <div style={{ ...inner, fontSize: 12.5, color: c.hint, borderTop: `1px solid ${c.divider}`, paddingTop: 20 }}>
-          © ۱۴۰۵ دفتر خرج
+          © ۱۴۰۵ Ham-Kharj
         </div>
       </div>
     </div>

@@ -99,8 +99,8 @@ export function AuthPage({ mode, onAuthenticated }) {
 
       <div style={{ width: "100%", maxWidth: 420, display: "flex", alignItems: "center", justifyContent: "space-between", position: "relative", marginBottom: 28 }}>
         <a {...linkProps("/")} style={{ display: "flex", alignItems: "center", gap: 10, color: c.text }}>
-          <span style={{ width: 38, height: 38, borderRadius: 12, background: BRAND.green, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 16 }}>م</span>
-          <span style={{ fontWeight: 800, fontSize: 16 }}>دفتر خرج</span>
+          <img src="/icon-192.png" alt="" width={38} height={38} style={{ width: 38, height: 38, borderRadius: "50%", display: "block" }} />
+          <span dir="ltr" style={{ fontWeight: 800, fontSize: 16 }}>Ham-Kharj</span>
         </a>
         <a {...linkProps("/")} style={{ fontSize: 13, fontWeight: 600, color: c.hint }}>بازگشت</a>
       </div>
