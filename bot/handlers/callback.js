@@ -1,10 +1,17 @@
 import { getUserState, clearUserState, setUserState } from "../services/state.js";
 import { query } from "../../db/index.js";
+import { handleWebLoginCallback } from "./webLogin.js";
 
 export async function handleCallback(ctx) {
   const userId = ctx.from.id;
   const accountId = ctx.account.id;
   const data = ctx.callbackQuery.data;
+
+  if (data.startsWith("weblogin:")) {
+    await handleWebLoginCallback(ctx, data);
+    return;
+  }
+
   const current = getUserState(userId);
 
   if (data === "expense:edit") {

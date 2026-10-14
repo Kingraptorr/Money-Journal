@@ -161,6 +161,8 @@ CREATE TABLE IF NOT EXISTS login_requests (
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'claimed', 'expired')),
   user_id BIGINT REFERENCES users(id) ON DELETE CASCADE,
   device_label TEXT,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  kind TEXT NOT NULL DEFAULT 'approval' CHECK (kind IN ('approval', 'code_challenge')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   expires_at TIMESTAMPTZ NOT NULL
 );

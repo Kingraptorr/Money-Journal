@@ -3,6 +3,8 @@ import express from "express";
 import cors from "cors";
 import { authRouter } from "./routes/auth.js";
 import { emailAuthRouter } from "./routes/emailAuth.js";
+import { telegramLoginRouter } from "./routes/telegramLogin.js";
+import { purgeOldLoginArtifacts } from "../db/webLogin.js";
 import { expensesRouter } from "./routes/expenses.js";
 import { categoriesRouter } from "./routes/categories.js";
 import { reportsRouter } from "./routes/reports.js";
@@ -34,6 +36,7 @@ app.get("/health", (_req, res) => {
 
 app.use("/api/auth", authRouter);
 app.use("/api/auth", emailAuthRouter);
+app.use("/api/auth", telegramLoginRouter);
 app.use("/api/expenses", requireAuth, expensesRouter);
 app.use("/api/categories", requireAuth, categoriesRouter);
 app.use("/api/reports", requireAuth, reportsRouter);
@@ -53,8 +56,10 @@ app.listen(port, host, () => {
   console.log(`AI Money Journal API listening on ${host}:${port}`);
 });
 
-purgeOldSessions().catch((error) => console.error("Session purge failed:", error.message));
-setInterval(
-  () => purgeOldSessions().catch((error) => console.error("Session purge failed:", error.message)),
-  24 * 60 * 60 * 1000,
-).unref();
+function purgeAuthData() {
+  purgeOldSessions().catch((error) => console.error("Session purge failed:", error.message));
+  purgeOldLoginArtifacts().catch((error) => console.error("Login artifact purge failed:", error.message));
+}
+
+purgeAuthData();
+setInterval(purgeAuthData, 24 * 60 * 60 * 1000).unref();

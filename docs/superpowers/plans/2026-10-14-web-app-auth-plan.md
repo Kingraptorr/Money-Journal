@@ -100,6 +100,8 @@ Files: new `api/routes/telegramLogin.js`, `db/oneTimeCodes.js`; edit `bot/handle
 - [ ] Guess protection for C: the web app first calls `POST /api/auth/code/challenge` and gets an opaque `challengeId` (stored in `login_requests`, rate limited to 10 per hour per IP). `POST /api/auth/code` takes `{challengeId, code}`; a challenge dies after 5 wrong codes. Without a challenge, a 6-digit code could be guessed globally against every active code. Requires one additive column: `login_requests.attempts INTEGER NOT NULL DEFAULT 0`.
 - [ ] Code comparison is constant-time on the hash; codes are random from `crypto.randomInt`.
 
+Implementation notes (done): `login_requests` gained `attempts` and `kind` ('approval' | 'code_challenge') via `db/migrations/2026-10-login-requests-columns.sql`. Shared logic lives in `db/webLogin.js` (used by both API and bot). The bot username for the deep link comes from `TELEGRAM_BOT_USERNAME` or a cached `getMe`. Codes are HMAC-hashed with the server secret and a new code is regenerated if it would collide with another active code. **Phase 7 client contract:** `POST /api/auth/telegram/request` then poll `GET /api/auth/telegram/poll?requestId=` with header `X-Poll-Secret` every ~2 s (202 pending, 200 approved + cookies, 403 rejected, 410 expired); for the code path call `POST /api/auth/code/challenge` first, then `POST /api/auth/code {challengeId, code}`.
+
 Verify: full approve flow end to end; reject; expired request; wrong poll secret; replayed claim; leaked link used from a second browser fails; code reuse fails; 6th wrong code burns the code; `/web` twice invalidates the first code.
 
 ## Phase 6: Linking
