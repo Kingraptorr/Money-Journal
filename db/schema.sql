@@ -106,3 +106,10 @@ CREATE TABLE IF NOT EXISTS debt_insights (
   sentence TEXT NOT NULL,
   generated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE TABLE IF NOT EXISTS bot_usage_daily (
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  usage_date DATE NOT NULL,
+  count INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (user_id, usage_date)
+);

@@ -1,6 +1,7 @@
 import { transcribeVoice } from "../services/whisper.js";
 import { normalizeVoiceTranscript } from "../services/gemini.js";
-import { processUserText } from "./message.js";
+import { processUserText, replyIfOverDailyLimit } from "./message.js";
+import { getUserState } from "../services/state.js";
 
 function normalizeTranscription(transcription) {
   if (typeof transcription === "string") return transcription.trim();
@@ -28,6 +29,10 @@ function buildVoiceErrorMessage(error) {
 
 export async function handleVoiceMessage(ctx) {
   try {
+    if (getUserState(ctx.from.id).state !== "awaiting_clarification" && (await replyIfOverDailyLimit(ctx))) {
+      return;
+    }
+
     const file = await ctx.getFile();
     const fileUrl = `https://api.telegram.org/file/bot${process.env.TELEGRAM_BOT_TOKEN}/${file.file_path}`;
     const response = await fetch(fileUrl);

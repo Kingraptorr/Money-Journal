@@ -54,6 +54,9 @@ function ineligibleText(reason, eligibleAt) {
       ? `گزارش این ماه از ${formatJalali(eligibleAt.slice(0, 10))} در دسترس می‌مونه، چون حداقل ۱۰ روز از ماه باید بگذره تا داده‌ی کافی جمع بشه.`
       : "برای این ماه هنوز ۱۰ روز از شروعش نگذشته، یکم دیگه صبر کن.";
   }
+  if (reason === "daily_limit") {
+    return "امروز یه گزارش گرفتی. هر روز فقط یک گزارش می‌تونی بگیری؛ از فردا دوباره می‌تونی.";
+  }
   if (reason === "cooldown" && eligibleAt) {
     const days = daysUntil(eligibleAt);
     return `هر ۳ روز یک‌بار می‌تونی گزارش جدید بگیری. تا ${days.toLocaleString("fa-IR")} روز دیگه صبر کن.`;
@@ -67,6 +70,7 @@ function generateLabelFor(status, generating) {
   if (status.reason === "too_early_in_month" && status.eligibleAt) {
     return `از ${formatJalali(status.eligibleAt.slice(0, 10))} در دسترسه`;
   }
+  if (status.reason === "daily_limit") return "امروز گزارش گرفتی؛ فردا دوباره بیا";
   if (status.reason === "cooldown" && status.eligibleAt) {
     const days = daysUntil(status.eligibleAt);
     return `${days.toLocaleString("fa-IR")} روز دیگه می‌تونی گزارش بگیری`;
@@ -117,13 +121,13 @@ export function Report({ month, onPrevMonth, onNextMonth }) {
       const result = await generateReport(monthKey, kind);
       setMessages((prev) => [...prev, { isAi: true, text: result.text }]);
       setChips(result.hasData ? (kind === "summary" ? ["deeper", "thanks"] : ["thanks"]) : ["thanks"]);
-      if (kind === "summary") await refreshStatus();
+      await refreshStatus();
     } catch (error) {
       let reason = error.message;
       let eligibleAt = null;
+      const fresh = await getReportStatus(monthKey);
+      setStatus(fresh);
       if (kind === "summary") {
-        const fresh = await getReportStatus(monthKey);
-        setStatus(fresh);
         reason = fresh.reason;
         eligibleAt = fresh.eligibleAt;
       }
@@ -146,6 +150,7 @@ export function Report({ month, onPrevMonth, onNextMonth }) {
   }
 
   const chipItems = (chips ?? [])
+    .filter((chip) => !(chip === "deeper" && status?.dailyLimitReached))
     .map((chip) => {
       if (chip === "deeper") return { key: "deeper", label: "بیشتر بگو", onClick: () => runGenerate("deeper") };
       if (chip === "thanks") return { key: "thanks", label: "ممنون", onClick: sayThanks };

@@ -4,6 +4,7 @@ import { extractExpense } from "../services/gemini.js";
 import { clearUserState, getUserState, setUserState } from "../services/state.js";
 import { buildConfirmationText, buildDeleteConfirmationText } from "../utils/format.js";
 import { CATEGORY_LABELS_FA } from "../utils/categories.js";
+import { DAILY_BOT_LIMIT, isOverBotLimit, recordBotUsage } from "../../db/usageLimits.js";
 
 const DELETE_STOPWORDS = [
   "اون",
@@ -130,6 +131,20 @@ async function handleDeleteIntent(ctx, extraction) {
   });
 }
 
+export async function replyIfOverDailyLimit(ctx) {
+  if (!(await isOverBotLimit(ctx.from.id))) return false;
+
+  const current = getUserState(ctx.from.id);
+  if (current.state === "awaiting_edit" && current.payload?.expense) {
+    setUserState(ctx.from.id, "awaiting_confirmation", { expense: current.payload.expense });
+  }
+
+  await ctx.reply(
+    `تعداد ثبت‌های امروزت به سقف ${DAILY_BOT_LIMIT.toLocaleString("fa-IR")} تا رسید. از نیمه‌شب (به وقت تهران) دوباره می‌تونی خرج ثبت کنی 🙂`,
+  );
+  return true;
+}
+
 async function sendPendingConfirmation(ctx, pendingExpense) {
   setUserState(ctx.from.id, "awaiting_confirmation", { expense: pendingExpense });
   await ctx.reply(buildConfirmationText(pendingExpense), {
@@ -201,6 +216,8 @@ async function processEditedText(ctx, rawInput, current) {
     return;
   }
 
+  await recordBotUsage(ctx.from.id);
+
   if (extraction.action === "delete" || (extraction.action === "irrelevant" && !meaningfulName)) {
     await ctx.reply("برای ویرایش، فقط نام خرج، مبلغ، یا هر دو رو بنویس.");
     return;
@@ -232,6 +249,7 @@ export async function processUserText(ctx, rawInput, options = {}) {
   const current = getUserState(ctx.from.id);
 
   if (current.state === "awaiting_edit" && current.payload?.expense) {
+    if (await replyIfOverDailyLimit(ctx)) return;
     await processEditedText(ctx, rawInput, current);
     return;
   }
@@ -240,6 +258,8 @@ export async function processUserText(ctx, rawInput, options = {}) {
     await processClarificationReply(ctx, rawInput, current);
     return;
   }
+
+  if (await replyIfOverDailyLimit(ctx)) return;
 
   let extraction;
 
@@ -254,6 +274,8 @@ export async function processUserText(ctx, rawInput, options = {}) {
     );
     return;
   }
+
+  await recordBotUsage(ctx.from.id);
 
   if (extraction.action === "irrelevant" || extraction.needs_clarification) {
     const pendingExpense = {

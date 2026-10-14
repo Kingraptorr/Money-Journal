@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { query } from "../../db/index.js";
+import { isAdminUser } from "../../db/usageLimits.js";
 import { generateMonthlyReport } from "../services/gemini.js";
 import { jalaliMonthRange } from "./expenses.js";
 
@@ -64,17 +65,44 @@ function daysIntoMonth(month) {
   return Math.round((today.getTime() - startDate.getTime()) / 86400000) + 1;
 }
 
+async function checkDailyReportLimit(userId) {
+  if (isAdminUser(userId)) return { reached: false, resetAt: null };
+
+  const result = await query(
+    `SELECT COUNT(*)::int AS used,
+            ((date_trunc('day', NOW() AT TIME ZONE 'Asia/Tehran') + INTERVAL '1 day') AT TIME ZONE 'Asia/Tehran') AS reset_at
+     FROM ai_reports
+     WHERE user_id = $1
+       AND has_data = true
+       AND created_at >= (date_trunc('day', NOW() AT TIME ZONE 'Asia/Tehran') AT TIME ZONE 'Asia/Tehran')`,
+    [userId],
+  );
+  const row = result.rows[0];
+  return { reached: row.used > 0, resetAt: new Date(row.reset_at).toISOString() };
+}
+
 async function checkSummaryEligibility(userId, month) {
+  const daily = await checkDailyReportLimit(userId);
+  const withDaily = (result) => ({
+    ...result,
+    dailyLimitReached: daily.reached,
+    dailyResetAt: daily.reached ? daily.resetAt : null,
+  });
+
   const days = daysIntoMonth(month);
   if (days < MIN_DAYS_INTO_MONTH) {
     const { start } = jalaliMonthRange(month);
     const eligibleAt = new Date(`${start}T00:00:00Z`);
     eligibleAt.setUTCDate(eligibleAt.getUTCDate() + (MIN_DAYS_INTO_MONTH - 1));
-    return { eligible: false, reason: "too_early_in_month", eligibleAt: eligibleAt.toISOString() };
+    return withDaily({ eligible: false, reason: "too_early_in_month", eligibleAt: eligibleAt.toISOString() });
+  }
+
+  if (daily.reached) {
+    return withDaily({ eligible: false, reason: "daily_limit", eligibleAt: daily.resetAt });
   }
 
   if (process.env.DISABLE_REPORT_COOLDOWN === "true") {
-    return { eligible: true, reason: "ok", eligibleAt: null };
+    return withDaily({ eligible: true, reason: "ok", eligibleAt: null });
   }
 
   const last = await query(
@@ -85,11 +113,11 @@ async function checkSummaryEligibility(userId, month) {
     const lastAt = new Date(last.rows[0].created_at);
     const eligibleAt = new Date(lastAt.getTime() + COOLDOWN_DAYS * 86400000);
     if (eligibleAt.getTime() > Date.now()) {
-      return { eligible: false, reason: "cooldown", eligibleAt: eligibleAt.toISOString() };
+      return withDaily({ eligible: false, reason: "cooldown", eligibleAt: eligibleAt.toISOString() });
     }
   }
 
-  return { eligible: true, reason: "ok", eligibleAt: null };
+  return withDaily({ eligible: true, reason: "ok", eligibleAt: null });
 }
 
 async function fetchCategoryBreakdown(userId, month) {
@@ -165,6 +193,12 @@ reportsRouter.post("/generate", async (req, res, next) => {
         [req.user.id, month, text, hasData],
       );
       res.json({ text, hasData });
+      return;
+    }
+
+    const daily = await checkDailyReportLimit(req.user.id);
+    if (daily.reached) {
+      res.status(403).json({ error: "daily_limit", eligibleAt: daily.resetAt });
       return;
     }
 
