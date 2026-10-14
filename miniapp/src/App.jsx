@@ -29,7 +29,7 @@ import { displayName, getTelegramUser } from "./utils/telegramUser.js";
 const WIDE_BREAKPOINT = 900;
 const TREND_MIN_DAY = 7;
 
-export default function App() {
+export default function App({ webAccount = null, onLogout = null }) {
   const [screen, setScreen] = useState("dashboard");
   const [month, setMonth] = useState(currentJalaliMonth);
   const [selectedCategory, setSelectedCategory] = useState(null);
@@ -166,7 +166,7 @@ export default function App() {
 
   const total = Number(summary.total ?? 0);
   const avatarPhotoUrl = telegramUser?.photoUrl ?? null;
-  const avatarName = displayName(telegramUser);
+  const avatarName = displayName(telegramUser) || webAccount?.displayName || "";
 
   const railActive = { activeBg: `${ACCENT_PRIMARY}1f`, activeColor: ACCENT_PRIMARY };
   const railInactive = { activeBg: "transparent", activeColor: "var(--tg-theme-hint-color)" };
@@ -269,7 +269,7 @@ export default function App() {
               isWide={isWide}
               avatarPhotoUrl={avatarPhotoUrl}
               avatarName={avatarName}
-              userFirstName={telegramUser?.firstName || avatarName}
+              userFirstName={telegramUser?.firstName || webAccount?.displayName || avatarName}
               onOpenCurrency={() => setScreen("currency")}
               debtsSummary={debtsSummary}
               onOpenDebts={() => setScreen("debts")}
@@ -320,6 +320,8 @@ export default function App() {
               theme={theme}
               onToggleTheme={toggleTheme}
               onOpenCategories={() => setScreen("categories")}
+              webMode={Boolean(webAccount)}
+              onLogout={onLogout}
               isWide={isWide}
               avatarPhotoUrl={avatarPhotoUrl}
               avatarName={avatarName}

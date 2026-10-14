@@ -24,7 +24,62 @@ export async function authenticate() {
   return sessionToken;
 }
 
+export function isTelegramMode() {
+  return Boolean(WebApp.initData || window.Telegram?.WebApp?.initData);
+}
+
+export async function authHeaders() {
+  if (!isTelegramMode()) return {};
+  return { Authorization: `Bearer ${await authenticate()}` };
+}
+
+let refreshInFlight = null;
+
+function refreshWebSession() {
+  refreshInFlight ??= fetch(`${API_BASE_URL}/api/auth/refresh`, {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    body: "{}",
+  })
+    .then((response) => response.ok)
+    .catch(() => false)
+    .finally(() => {
+      refreshInFlight = null;
+    });
+  return refreshInFlight;
+}
+
+// Browser (non-Telegram) mode: the session lives in httpOnly cookies. Cookie-authenticated writes
+// must be JSON, so every non-GET request carries a JSON content type.
+async function webApi(path, options = {}, retried = false) {
+  const method = String(options.method ?? "GET").toUpperCase();
+  const headers = { ...(options.headers ?? {}) };
+  if (method !== "GET" && !headers["Content-Type"]) headers["Content-Type"] = "application/json";
+
+  const response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers, credentials: "same-origin" });
+
+  if (response.status === 401 && !retried && (await refreshWebSession())) {
+    return webApi(path, options, true);
+  }
+
+  if (!response.ok) {
+    if (response.status === 401) window.dispatchEvent(new Event("mj:auth-expired"));
+    let code = "api_error";
+    try {
+      const body = await response.json();
+      if (body?.error) code = body.error;
+    } catch {
+      // response had no JSON body; keep the generic code
+    }
+    throw new Error(code);
+  }
+  return response.json();
+}
+
 async function api(path, options = {}) {
+  if (!isTelegramMode()) return webApi(path, options);
+
   const token = await authenticate();
 
   const response = await fetch(`${API_BASE_URL}${path}`, {

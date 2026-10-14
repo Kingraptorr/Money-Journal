@@ -109,6 +109,16 @@ emailAuthRouter.post("/logout", requireTrustedMutation, async (req, res, next) =
   }
 });
 
+emailAuthRouter.post("/logout-all", requireAuth, requireTrustedMutation, async (req, res, next) => {
+  try {
+    await revokeAllSessions(req.user.id);
+    clearAuthCookies(res);
+    res.json({ ok: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
 emailAuthRouter.get("/me", requireAuth, async (req, res, next) => {
   try {
     const account = await describeAccount(req.user.id);

@@ -132,6 +132,8 @@ Files: `miniapp/src/main.jsx`, `App.jsx`, `utils/api.js`, new `miniapp/src/auth/
 
 Verify in the browser pane and on a phone-width viewport: signup, login, reload keeps session, logout; Telegram button and code paths; Mini App still loads and behaves as before.
 
+Implementation notes (done): the Landing and Login pages are ports of the Claude Design files "Money Journal Landing.dc.html" and "Money Journal Login.dc.html" (same tokens as the app theme; Vazirmatn is served locally). Deliberate differences from the design: no "forgot password" link (reset is disabled), no terms/privacy acceptance sentence or footer legal links (legal pages are out of scope), the hero screenshot slot is a CSS-built preview, the Telegram button expands into a waiting panel with a 6-digit code alternative, and an add-to-home-screen card was added for mobile browsers. The web app is path-routed (`/`, `/login`, `/register`); Telegram `initData` selects Mini App mode. `POST /api/auth/logout-all` was added for "log out of all devices". Manifest is `manifest.json` because nginx serves `.webmanifest` as octet-stream.
+
 ## Phase 8: Hardening and rollout
 
 - [ ] Abuse pass from the spec's test list, run again against production: replay, expiry, wrong secret, rate limits, concurrent links.

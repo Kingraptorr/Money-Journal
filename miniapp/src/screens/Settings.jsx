@@ -1,7 +1,8 @@
 import { ChevronIcon, MoonIcon, SunIcon, TagIcon } from "../components/Icons.jsx";
 import { ScreenHeader } from "../components/ScreenHeader.jsx";
+import { AccountSection } from "../components/AccountSection.jsx";
 
-export function Settings({ theme, onToggleTheme, onOpenCategories, isWide, avatarPhotoUrl, avatarName }) {
+export function Settings({ theme, onToggleTheme, onOpenCategories, webMode, onLogout, isWide, avatarPhotoUrl, avatarName }) {
   const dark = theme === "dark";
 
   return (
@@ -64,6 +65,8 @@ export function Settings({ theme, onToggleTheme, onOpenCategories, isWide, avata
           </span>
         </button>
       </div>
+
+      <AccountSection webMode={webMode} onLogout={onLogout} />
     </div>
   );
 }
