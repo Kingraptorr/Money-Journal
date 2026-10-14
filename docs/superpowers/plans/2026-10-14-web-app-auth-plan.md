@@ -85,6 +85,8 @@ Files: new `api/services/passwords.js`, `api/services/sessions.js`, `api/middlew
 - [ ] CORS: allow only `WEB_APP_ORIGIN` with credentials; keep bearer access for the Mini App on the same origin.
 - [ ] State-changing cookie requests require `Content-Type: application/json` (blocks simple cross-site form posts).
 
+Implementation notes (done): the API now binds to `127.0.0.1` (override with `HOST`), because port 3000 was reachable from the public internet and `X-Forwarded-For` could be forged to dodge IP rate limits; `trust proxy` is set to 1 to match nginx. Optional env: `COOKIE_SECURE=false` (local http dev only), `CORS_EXTRA_ORIGINS` (comma list). **Phase 7 client rule:** every non-GET request sent with the cookie session must carry `Content-Type: application/json` (the server rejects anything else with 403).
+
 Verify: signup then login then `/me`; wrong password and unknown email return identical responses; duplicate email returns `email_taken`; refresh rotates and old refresh token is rejected; logout revokes; 11th bad login is 429; a request with no cookie and no bearer is 401; existing bearer flow unchanged.
 
 ## Phase 5: Telegram handshakes (A button, C code)
