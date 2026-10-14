@@ -2,93 +2,60 @@ import { query } from "../../db/index.js";
 import { generateDebtInsight } from "./gemini.js";
 import { debtsLogger } from "./debtsLogger.js";
 
-function matchesCache(row, summary) {
-  if (!row) return false;
-  return (
-    Number(row.overdue_count) === summary.overdueCount &&
-    Number(row.overdue_total) === summary.overdueTotal &&
-    Number(row.due_soon_count) === summary.dueSoonCount &&
-    Number(row.due_soon_total) === summary.dueSoonTotal &&
-    Number(row.remaining_balance) === summary.remainingBalance
-  );
-}
-
-// Gemini is slow and sometimes unavailable (503), and this runs on the app's initial load, so the
-// request never waits long for it: it returns the last stored sentence (or null) and lets the
-// generation finish in the background for the next load.
+// Gemini is asked for a debt insight at most once per user per Tehran day: the first time the user
+// opens the app that day. Every other open that day (and every day the app isn't opened) costs no
+// Gemini call and shows the stored sentence. A failed attempt is not retried until the next day.
+// The request waits briefly for the first attempt; if Gemini is slower, the sentence is stored when
+// it finishes and shows from the next open.
 const WAIT_FOR_GENERATION_MS = 2500;
-const FAILURE_COOLDOWN_MS = 10 * 60_000;
-const inFlight = new Map();
-const lastFailureAt = new Map();
+
+// Atomically claims today's single attempt. Returns true only for the one request that got it.
+async function claimTodaysAttempt(userId, summary) {
+  const result = await query(
+    `INSERT INTO debt_insights
+       (user_id, overdue_count, overdue_total, due_soon_count, due_soon_total, remaining_balance, sentence, last_attempt_date)
+     VALUES ($1, $2, $3, $4, $5, $6, NULL, (NOW() AT TIME ZONE 'Asia/Tehran')::date)
+     ON CONFLICT (user_id) DO UPDATE
+       SET last_attempt_date = (NOW() AT TIME ZONE 'Asia/Tehran')::date
+       WHERE debt_insights.last_attempt_date IS DISTINCT FROM (NOW() AT TIME ZONE 'Asia/Tehran')::date
+     RETURNING sentence`,
+    [userId, summary.overdueCount, summary.overdueTotal, summary.dueSoonCount, summary.dueSoonTotal, summary.remainingBalance],
+  );
+  if (result.rowCount === 0) return { claimed: false, previousSentence: null };
+  return { claimed: true, previousSentence: result.rows[0].sentence ?? null };
+}
 
 async function generateAndStore(userId, summary) {
-  const sentence = await generateDebtInsight(summary);
-  if (!sentence) throw new Error("empty_debt_insight_response");
-
-  await query(
-    `INSERT INTO debt_insights (user_id, overdue_count, overdue_total, due_soon_count, due_soon_total, remaining_balance, sentence, generated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
-     ON CONFLICT (user_id) DO UPDATE SET
-       overdue_count = EXCLUDED.overdue_count,
-       overdue_total = EXCLUDED.overdue_total,
-       due_soon_count = EXCLUDED.due_soon_count,
-       due_soon_total = EXCLUDED.due_soon_total,
-       remaining_balance = EXCLUDED.remaining_balance,
-       sentence = EXCLUDED.sentence,
-       generated_at = NOW()`,
-    [
-      userId,
-      summary.overdueCount,
-      summary.overdueTotal,
-      summary.dueSoonCount,
-      summary.dueSoonTotal,
-      summary.remainingBalance,
-      sentence,
-    ],
-  );
-  return sentence;
-}
-
-function startGeneration(userId, summary) {
-  const key = String(userId);
-
-  const job = generateAndStore(userId, summary)
-    .then((sentence) => {
-      lastFailureAt.delete(key);
-      return sentence;
-    })
-    .catch((error) => {
-      lastFailureAt.set(key, Date.now());
-      debtsLogger.error({ err: error, userId }, "debt_insight_generation_failed");
-      return null;
-    })
-    .finally(() => inFlight.delete(key));
-
-  inFlight.set(key, job);
-  return job;
+  try {
+    const sentence = await generateDebtInsight(summary);
+    if (!sentence) throw new Error("empty_debt_insight_response");
+    await query(
+      `UPDATE debt_insights
+       SET overdue_count = $2, overdue_total = $3, due_soon_count = $4, due_soon_total = $5,
+           remaining_balance = $6, sentence = $7, generated_at = NOW()
+       WHERE user_id = $1`,
+      [userId, summary.overdueCount, summary.overdueTotal, summary.dueSoonCount, summary.dueSoonTotal, summary.remainingBalance, sentence],
+    );
+    return sentence;
+  } catch (error) {
+    debtsLogger.error({ err: error, userId }, "debt_insight_generation_failed");
+    return null;
+  }
 }
 
 export async function getOrGenerateDebtInsight(userId, summary) {
   if (summary.remainingBalance <= 0) return null;
 
-  const cached = await query(`SELECT * FROM debt_insights WHERE user_id = $1`, [userId]);
-  const row = cached.rows[0];
-
-  if (matchesCache(row, summary)) {
-    return row.sentence;
+  const attempt = await claimTodaysAttempt(userId, summary);
+  if (!attempt.claimed) {
+    const stored = await query(`SELECT sentence FROM debt_insights WHERE user_id = $1`, [userId]);
+    return stored.rows[0]?.sentence ?? null;
   }
 
-  const stale = row?.sentence ?? null;
-  const key = String(userId);
-  const failedAt = lastFailureAt.get(key);
-  // Someone is already generating it, or it failed recently: don't wait, don't pile on.
-  if (inFlight.has(key)) return stale;
-  if (failedAt && Date.now() - failedAt < FAILURE_COOLDOWN_MS) return stale;
-
-  const job = startGeneration(userId, summary);
-  const waited = await Promise.race([
+  const job = generateAndStore(userId, summary);
+  const generated = await Promise.race([
     job,
     new Promise((resolve) => setTimeout(() => resolve(null), WAIT_FOR_GENERATION_MS)),
   ]);
-  return waited ?? stale;
+  return generated ?? attempt.previousSentence;
 }

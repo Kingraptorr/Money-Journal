@@ -103,8 +103,9 @@ CREATE TABLE IF NOT EXISTS debt_insights (
   due_soon_count INTEGER NOT NULL,
   due_soon_total NUMERIC(14, 2) NOT NULL,
   remaining_balance NUMERIC(14, 2) NOT NULL,
-  sentence TEXT NOT NULL,
-  generated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  sentence TEXT,
+  generated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  last_attempt_date DATE
 );
 
 CREATE TABLE IF NOT EXISTS bot_usage_daily (
