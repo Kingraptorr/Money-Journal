@@ -61,6 +61,7 @@ Verify: existing user resolves to the same ID; new Telegram user created as befo
 
 This phase must be indistinguishable from today for every existing user. Deploy it alone and watch it.
 
+- [ ] Immediately before deploying, re-run `db/migrations/2026-10-accounts-backfill.sql` as the app role. It is idempotent and only touches users with no identity, so it self-heals Telegram users created since Phase 1 and never gives email accounts a bogus Telegram identity (caught by the Phase 2 tests).
 - [ ] `bot/index.js`: add middleware before handlers: `ctx.account = await resolveTelegramAccount(ctx.from)` (skip for updates without `from`). Keep the timing middleware.
 - [ ] `bot/handlers/*`: replace DB-facing `ctx.from.id` with `ctx.account.id`; leave `getUserState/setUserState/clearUserState` keyed by `ctx.from.id`. Remove the now-redundant `upsertUser` calls.
 - [ ] `db/usageLimits.js`: `isOverBotLimit` / `recordBotUsage` take account ID and use `isAdminAccount`. `api/routes/reports.js` awaits `isAdminAccount`.
@@ -93,7 +94,8 @@ Files: new `api/routes/telegramLogin.js`, `db/oneTimeCodes.js`; edit `bot/handle
 - [ ] `POST /api/auth/telegram/request`: create `login_request` (5 min), return `{ requestId, pollSecret, botLink }` where `botLink = https://t.me/<bot>?start=web_<requestId>`. Only the hash of `pollSecret` is stored.
 - [ ] Bot `/start web_<requestId>`: show device label with Approve / Reject inline buttons. Approve sets status `approved` and `user_id = ctx.account.id`; Reject sets `rejected`. Expired or unknown requests get a clear message.
 - [ ] `GET /api/auth/telegram/poll` (header `X-Poll-Secret`): `pending` returns 202; `approved` creates a session, sets cookies, marks `claimed`; other statuses return the matching error. Single use.
-- [ ] Bot `/web`: issues a `web_login` code for the account (10 min, single use, replaces any earlier code). `POST /api/auth/code` consumes it, checking attempts (max 5) and expiry, then creates a session.
+- [ ] Bot `/web`: issues a `web_login` code for the account (5 min, single use, replaces any earlier code).
+- [ ] Guess protection for C: the web app first calls `POST /api/auth/code/challenge` and gets an opaque `challengeId` (stored in `login_requests`, rate limited to 10 per hour per IP). `POST /api/auth/code` takes `{challengeId, code}`; a challenge dies after 5 wrong codes. Without a challenge, a 6-digit code could be guessed globally against every active code. Requires one additive column: `login_requests.attempts INTEGER NOT NULL DEFAULT 0`.
 - [ ] Code comparison is constant-time on the hash; codes are random from `crypto.randomInt`.
 
 Verify: full approve flow end to end; reject; expired request; wrong poll secret; replayed claim; leaked link used from a second browser fails; code reuse fails; 6th wrong code burns the code; `/web` twice invalidates the first code.

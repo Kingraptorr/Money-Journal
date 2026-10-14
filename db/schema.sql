@@ -113,3 +113,56 @@ CREATE TABLE IF NOT EXISTS bot_usage_daily (
   count INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (user_id, usage_date)
 );
+
+CREATE SEQUENCE IF NOT EXISTS account_id_seq START 5000000000000000;
+
+CREATE TABLE IF NOT EXISTS auth_identities (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  provider TEXT NOT NULL CHECK (provider IN ('telegram', 'email')),
+  provider_user_id TEXT NOT NULL,
+  password_hash TEXT,
+  verified_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (provider, provider_user_id),
+  UNIQUE (user_id, provider)
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  refresh_token_hash TEXT NOT NULL UNIQUE,
+  device_label TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  last_used_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  expires_at TIMESTAMPTZ NOT NULL,
+  revoked_at TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
+
+CREATE TABLE IF NOT EXISTS one_time_codes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  purpose TEXT NOT NULL CHECK (purpose IN ('web_login', 'link_telegram', 'verify_email', 'reset_password')),
+  user_id BIGINT REFERENCES users(id) ON DELETE CASCADE,
+  email TEXT,
+  code_hash TEXT NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  consumed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_one_time_codes_lookup ON one_time_codes(purpose, code_hash);
+
+CREATE TABLE IF NOT EXISTS login_requests (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  poll_secret_hash TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'claimed', 'expired')),
+  user_id BIGINT REFERENCES users(id) ON DELETE CASCADE,
+  device_label TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  expires_at TIMESTAMPTZ NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_login_requests_expires ON login_requests(expires_at);
