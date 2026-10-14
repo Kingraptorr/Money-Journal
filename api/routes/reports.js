@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { query } from "../../db/index.js";
-import { isAdminUser } from "../../db/usageLimits.js";
+import { isAdminAccount } from "../../db/accounts.js";
 import { generateMonthlyReport } from "../services/gemini.js";
 import { jalaliMonthRange } from "./expenses.js";
 
@@ -66,7 +66,7 @@ function daysIntoMonth(month) {
 }
 
 async function checkDailyReportLimit(userId) {
-  if (isAdminUser(userId)) return { reached: false, resetAt: null };
+  if (await isAdminAccount(userId)) return { reached: false, resetAt: null };
 
   const result = await query(
     `SELECT COUNT(*)::int AS used,

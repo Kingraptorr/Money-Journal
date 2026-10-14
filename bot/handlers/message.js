@@ -1,5 +1,5 @@
 import { InlineKeyboard } from "grammy";
-import { upsertUser, query } from "../../db/index.js";
+import { query } from "../../db/index.js";
 import { extractExpense } from "../services/gemini.js";
 import { clearUserState, getUserState, setUserState } from "../services/state.js";
 import { buildConfirmationText, buildDeleteConfirmationText } from "../utils/format.js";
@@ -71,7 +71,7 @@ function mergeEditedExpense(originalExpense, editedInput, extraction) {
 }
 
 async function handleDeleteIntent(ctx, extraction) {
-  const userId = ctx.from.id;
+  const userId = ctx.account.id;
   let result;
 
   if (extraction.target === "specific" && extraction.hint) {
@@ -132,7 +132,7 @@ async function handleDeleteIntent(ctx, extraction) {
 }
 
 export async function replyIfOverDailyLimit(ctx) {
-  if (!(await isOverBotLimit(ctx.from.id))) return false;
+  if (!(await isOverBotLimit(ctx.account.id))) return false;
 
   const current = getUserState(ctx.from.id);
   if (current.state === "awaiting_edit" && current.payload?.expense) {
@@ -216,7 +216,7 @@ async function processEditedText(ctx, rawInput, current) {
     return;
   }
 
-  await recordBotUsage(ctx.from.id);
+  await recordBotUsage(ctx.account.id);
 
   if (extraction.action === "delete" || (extraction.action === "irrelevant" && !meaningfulName)) {
     await ctx.reply("برای ویرایش، فقط نام خرج، مبلغ، یا هر دو رو بنویس.");
@@ -245,7 +245,6 @@ async function processEditedText(ctx, rawInput, current) {
 }
 
 export async function processUserText(ctx, rawInput, options = {}) {
-  await upsertUser(ctx.from);
   const current = getUserState(ctx.from.id);
 
   if (current.state === "awaiting_edit" && current.payload?.expense) {
@@ -275,7 +274,7 @@ export async function processUserText(ctx, rawInput, options = {}) {
     return;
   }
 
-  await recordBotUsage(ctx.from.id);
+  await recordBotUsage(ctx.account.id);
 
   if (extraction.action === "irrelevant" || extraction.needs_clarification) {
     const pendingExpense = {

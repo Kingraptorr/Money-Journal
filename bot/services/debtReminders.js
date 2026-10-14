@@ -33,10 +33,11 @@ function buildMessage(rows) {
 
 export async function sendDebtReminders(bot) {
   const result = await query(
-    `SELECT d.user_id, d.name, d.currency, di.amount,
+    `SELECT d.user_id, a.provider_user_id AS chat_id, d.name, d.currency, di.amount,
             (di.due_date - (NOW() AT TIME ZONE 'Asia/Tehran')::date) AS days_until_due
      FROM debt_installments di
      JOIN debts d ON d.id = di.debt_id
+     JOIN auth_identities a ON a.user_id = d.user_id AND a.provider = 'telegram'
      WHERE d.deleted_at IS NULL
        AND d.status = 'active'
        AND di.paid_at IS NULL
@@ -56,7 +57,7 @@ export async function sendDebtReminders(bot) {
   }
 
   const outcomes = await Promise.allSettled(
-    Array.from(rowsByUser.entries()).map(([userId, rows]) => bot.api.sendMessage(userId, buildMessage(rows))),
+    Array.from(rowsByUser.entries()).map(([, rows]) => bot.api.sendMessage(Number(rows[0].chat_id), buildMessage(rows))),
   );
 
   outcomes.forEach((outcome, index) => {

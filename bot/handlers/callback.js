@@ -3,6 +3,7 @@ import { query } from "../../db/index.js";
 
 export async function handleCallback(ctx) {
   const userId = ctx.from.id;
+  const accountId = ctx.account.id;
   const data = ctx.callbackQuery.data;
   const current = getUserState(userId);
 
@@ -30,7 +31,7 @@ export async function handleCallback(ctx) {
        (user_id, amount, currency, category, merchant, note, expense_date, raw_input, gemini_response)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
       [
-        userId,
+        accountId,
         expense.amount,
         expense.currency,
         expense.category,
@@ -62,7 +63,7 @@ export async function handleCallback(ctx) {
        SET deleted_at = NOW()
        WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
        RETURNING id`,
-      [expenseId, userId],
+      [expenseId, accountId],
     );
 
     clearUserState(userId);
@@ -85,7 +86,7 @@ export async function handleCallback(ctx) {
       `UPDATE expenses
        SET deleted_at = NOW()
        WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL`,
-      [callbackExpenseId, userId],
+      [callbackExpenseId, accountId],
     );
     clearUserState(userId);
     await ctx.answerCallbackQuery();

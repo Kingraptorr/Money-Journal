@@ -11,19 +11,6 @@ export async function query(text, params = []) {
   return result;
 }
 
-export async function upsertUser(user) {
-  await query(
-    `INSERT INTO users (id, first_name, last_name, username)
-     VALUES ($1, $2, $3, $4)
-     ON CONFLICT (id) DO UPDATE SET
-       first_name = EXCLUDED.first_name,
-       last_name = EXCLUDED.last_name,
-       username = EXCLUDED.username`,
-    [user.id, user.first_name ?? null, user.last_name ?? null, user.username ?? null],
-  );
-  await ensureDefaultCategories(user.id);
-}
-
 export async function ensureDefaultCategories(userId) {
   const existing = await query(`SELECT 1 FROM categories WHERE user_id = $1 LIMIT 1`, [userId]);
   if (existing.rowCount > 0) return;

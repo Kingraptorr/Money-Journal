@@ -6,6 +6,7 @@ import { handleTextMessage } from "./handlers/message.js";
 import { handleVoiceMessage } from "./handlers/voice.js";
 import { handleCallback } from "./handlers/callback.js";
 import { query } from "../db/index.js";
+import { resolveTelegramAccount } from "../db/accounts.js";
 import { refreshCurrencyRates } from "./services/currencyRates.js";
 import { sendDebtReminders } from "./services/debtReminders.js";
 
@@ -76,6 +77,11 @@ bot.use(async (ctx, next) => {
   );
 });
 
+bot.use(async (ctx, next) => {
+  if (ctx.from) ctx.account = await resolveTelegramAccount(ctx.from);
+  await next();
+});
+
 bot.command("start", handleStart);
 bot.command("dashboard", handleDashboard);
 bot.on("message:text", handleTextMessage);
@@ -86,7 +92,7 @@ cron.schedule(
   "0 22 * * *",
   async () => {
     const activeUsers = await query(
-      `SELECT u.id,
+      `SELECT a.provider_user_id AS chat_id,
               EXISTS (
                 SELECT 1
                 FROM expenses today
@@ -95,6 +101,7 @@ cron.schedule(
                   AND today.expense_date = (NOW() AT TIME ZONE 'Asia/Tehran')::date
               ) AS has_expense_today
        FROM users u
+       JOIN auth_identities a ON a.user_id = u.id AND a.provider = 'telegram'
        WHERE EXISTS (
          SELECT 1
          FROM expenses e
@@ -109,7 +116,7 @@ cron.schedule(
           ? REMINDER_MESSAGES_HAS_EXPENSE_TODAY
           : REMINDER_MESSAGES_NO_EXPENSE_TODAY;
 
-        return bot.api.sendMessage(user.id, pickRandom(messages));
+        return bot.api.sendMessage(Number(user.chat_id), pickRandom(messages));
       }),
     );
   },

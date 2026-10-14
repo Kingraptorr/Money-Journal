@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { upsertUser } from "../../db/index.js";
+import { resolveTelegramAccount } from "../../db/accounts.js";
 import { signSession, validateTelegramInitData } from "../middleware/auth.js";
 
 export const authRouter = Router();
@@ -15,7 +15,7 @@ authRouter.post("/telegram", async (req, res, next) => {
 
     const params = new URLSearchParams(initData);
     const telegramUser = JSON.parse(params.get("user"));
-    await upsertUser({
+    const account = await resolveTelegramAccount({
       id: telegramUser.id,
       first_name: telegramUser.first_name,
       last_name: telegramUser.last_name,
@@ -23,7 +23,7 @@ authRouter.post("/telegram", async (req, res, next) => {
     });
 
     res.json({
-      token: signSession(telegramUser.id),
+      token: signSession(account.id),
       user: telegramUser,
     });
   } catch (error) {

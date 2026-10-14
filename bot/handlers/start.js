@@ -1,8 +1,6 @@
 import { InlineKeyboard } from "grammy";
-import { upsertUser } from "../../db/index.js";
 
 export async function handleStart(ctx) {
-  await upsertUser(ctx.from);
   await ctx.reply(`سلام! 👋 به AI Money Journal خوش اومدی.
 هر خرجی داری بنویس یا ضبط صدا بفرست — من ثبتش می‌کنم.
 
