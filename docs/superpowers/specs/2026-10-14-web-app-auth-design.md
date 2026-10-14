@@ -1,0 +1,96 @@
+# Web App Login and Account Architecture
+
+Status: design approved in conversation 2026-10-14, awaiting written-spec review.
+Scope: identity, login, linking and session architecture for a standalone web app (PWA) alongside the Telegram bot and Mini App. The landing page, install-to-home-screen prompt, and any web quick-entry feature are separate designs.
+
+## Decisions
+
+| Topic | Decision |
+|---|---|
+| Who can use the web app | Anyone. Independent accounts from day one; Telegram is optional. |
+| Independent sign-in | Email + password only. No phone, Google, or passkey at launch. |
+| Telegram users on the web | "Continue with Telegram": bot-approved login via the Telegram button (A) or a 6-digit code (C). No QR code. |
+| Linking email and Telegram | Allowed only when at most one side has data. If both have data, refuse and ask which to keep. No merging. |
+| Account model | Accounts + identities. `users.id` stays a numeric internal account ID, so no migration of existing rows. |
+| Frontend | One codebase, two modes: Mini App when Telegram `initData` is present, web app otherwise. |
+| Email delivery | Amazon SES (needs SPF/DKIM DNS records added by the owner). |
+
+## Identity model
+
+`users` remains the account table. Existing Telegram-originated accounts keep their ID (the Telegram ID). New email-originated accounts take IDs from a sequence starting at 5,000,000,000,000,000, which is above any possible Telegram user ID, so the two ranges cannot collide.
+
+New tables:
+
+- `auth_identities (id, user_id, provider 'telegram'|'email', provider_user_id, password_hash, verified_at, created_at)`
+  - `UNIQUE (provider, provider_user_id)` and `UNIQUE (user_id, provider)`: one Telegram and one email per account.
+  - `provider_user_id` is the Telegram ID as text, or the lowercased email.
+  - `password_hash` is set for email identities only.
+- `sessions (id, user_id, refresh_token_hash, device_label, created_at, last_used_at, expires_at, revoked_at)`
+- `one_time_codes (id, purpose, user_id, email, code_hash, expires_at, attempts, consumed_at)`
+  - Purposes: `verify_email`, `reset_password`, `web_login` (issued by bot, consumed by web), `link_telegram` (issued by web, consumed by bot).
+- `login_requests (id, poll_secret_hash, status 'pending'|'approved'|'rejected'|'claimed'|'expired', user_id, device_label, expires_at)`
+
+Backfill: one `telegram` identity row per existing user, `provider_user_id = users.id`, verified.
+
+## Login flows
+
+1. **Email sign-up.** Email, password, display name. Account is created unverified; a 6-digit code is emailed. Login is refused until the code is entered. Code: hashed, 10 min, single use, 5 attempts.
+2. **Email login.** Email + password issues a session. Wrong email and wrong password return the same error. Rate-limited per email and per IP.
+3. **Forgot password.** Emailed single-use code, 30 minutes. Setting a new password revokes all sessions.
+4. **Continue with Telegram.**
+   - **A (button):** the web app creates a `login_request` and receives `{requestId, pollSecret, botLink}`. The link opens the bot at `/start web_<requestId>`. The bot shows the device label with Approve/Reject buttons. On approval the web app, holding the `pollSecret`, claims the session. The link alone is not enough to claim it.
+   - **C (code):** the user sends `/web` to the bot, which replies with a 6-digit `web_login` code. The user types it into the web app, which exchanges it for a session.
+5. **Mini App.** Unchanged: signed `initData` is verified, then resolved to an account through `auth_identities`.
+
+## Linking
+
+- **Add email to a Telegram account:** email, verification code, set password.
+- **Connect Telegram to an email account:** the web app issues a `link_telegram` code; the user sends `/link <code>` to the bot.
+- **Has data** means at least one non-deleted expense or at least one debt. Default categories are ignored.
+- **Rule, performed in one transaction:**
+  - Only one side has data: that account survives. The other identity is moved onto it and the empty account row is deleted.
+  - Neither side has data: the email account survives and the Telegram identity is moved onto it.
+  - Both sides have data: refuse with a "choose which account to keep" message. No data is moved.
+  - If the surviving account is not the one the user is logged into, all of the user's sessions are revoked and a new session for the surviving account is issued in the same response.
+
+## Sessions and security
+
+- Web app session: `httpOnly`, `Secure`, `SameSite=Lax` cookie holding a 15-minute access token, plus a 30-day rotating refresh token whose hash is stored in `sessions`. "Log out of all devices" revokes every row for the account.
+- Mini App keeps its in-memory bearer token. The API accepts either credential.
+- Passwords hashed with Node's built-in `scrypt`. Minimum 8 characters, never logged, small common-password blocklist.
+- Rate limits: login attempts per email and per IP; verification and reset emails per address; 5 tries per code.
+- CORS restricted to the web app's own origin (currently open to all origins).
+- Installed iPhone apps have their own cookie jar, so login must happen inside the installed app. The landing page must therefore place "add to home screen" before login. Designed separately.
+
+## System connections
+
+- One API serves the Mini App and web app. The bot shares the `db` module directly, as today.
+- A shared `resolveAccount()` maps a Telegram user or an email to an account ID. Everywhere the bot, Mini App auth, and jobs use `ctx.from.id` as the account ID, they resolve first.
+- Reminder jobs (22:00 daily prompt, 11:00 debt reminders) must select only accounts with a Telegram identity and send to that identity's chat ID. Today they send to `users.id`, which would fail for email-only accounts.
+- Admin is "account has a Telegram identity listed in `ADMIN_TELEGRAM_IDS`". Daily bot limit and daily report limit are keyed by account ID and apply to every door.
+
+## API and bot surface
+
+- API: `POST /api/auth/email/signup`, `.../verify-email`, `.../login`, `.../forgot`, `.../reset`, `POST /api/auth/logout`, `POST /api/auth/refresh`, `GET /api/auth/me`, `POST /api/auth/telegram/request`, `GET /api/auth/telegram/poll`, `POST /api/auth/code`, `POST /api/auth/link/telegram`, `POST /api/auth/link/email`.
+- Bot: `/start web_<requestId>` (approve), `/web` (issue code), `/link <code>`.
+
+## Error handling
+
+- Expired, used, or wrong codes return a single generic "invalid or expired" error.
+- Login failure messages never reveal whether an email exists.
+- Sign-up with an email already in use returns the same response as a fresh sign-up and sends a "you already have an account" email instead.
+- Linking refusal is explicit and non-destructive.
+
+## Testing
+
+Scripted flows on the server with disposable accounts, as used for the daily limits: full sign-up, verify, login, reset; both Telegram handshakes; linking in all four data combinations; plus abuse cases (expired and replayed codes, wrong poll secret, rate-limit trips, concurrent link attempts, existing Telegram users unaffected after backfill).
+
+## Out of scope
+
+Landing page and install prompt; natural-language quick entry on the web; passkeys, phone, and Google sign-in; account deletion and data export; account merging.
+
+## Open dependencies
+
+- SES setup and DNS records (owner action).
+- Terms of service and privacy policy, since the app will now hold emails and passwords.
+- Decision on whether web-only users get a natural-language quick-entry box, since they will not have the bot.
