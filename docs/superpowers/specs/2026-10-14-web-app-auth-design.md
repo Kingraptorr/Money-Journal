@@ -1,6 +1,6 @@
 # Web App Login and Account Architecture
 
-Status: design approved in conversation 2026-10-14, awaiting written-spec review.
+Status: design approved in conversation 2026-10-14; revised the same day to defer all email sending (no verification, no password reset). Awaiting final written-spec review.
 Scope: identity, login, linking and session architecture for a standalone web app (PWA) alongside the Telegram bot and Mini App. The landing page, install-to-home-screen prompt, and any web quick-entry feature are separate designs.
 
 ## Decisions
@@ -13,7 +13,10 @@ Scope: identity, login, linking and session architecture for a standalone web ap
 | Linking email and Telegram | Allowed only when at most one side has data. If both have data, refuse and ask which to keep. No merging. |
 | Account model | Accounts + identities. `users.id` stays a numeric internal account ID, so no migration of existing rows. |
 | Frontend | One codebase, two modes: Mini App when Telegram `initData` is present, web app otherwise. |
-| Email delivery | Amazon SES (needs SPF/DKIM DNS records added by the owner). |
+| Email delivery | Deferred. No emails are sent at launch. Amazon SES is the planned provider when it is enabled later. |
+| Email verification | Off at launch. Accounts are usable immediately after sign-up. `verified_at` is set at sign-up so verification can be switched on later without a migration. |
+| Forgot password | Disabled at launch. See "Interim account recovery". |
+| Legal pages, web quick entry | Out of scope for now. |
 
 ## Identity model
 
@@ -27,16 +30,17 @@ New tables:
   - `password_hash` is set for email identities only.
 - `sessions (id, user_id, refresh_token_hash, device_label, created_at, last_used_at, expires_at, revoked_at)`
 - `one_time_codes (id, purpose, user_id, email, code_hash, expires_at, attempts, consumed_at)`
-  - Purposes: `verify_email`, `reset_password`, `web_login` (issued by bot, consumed by web), `link_telegram` (issued by web, consumed by bot).
+  - Launch purposes: `web_login` (issued by bot, consumed by web) and `link_telegram` (issued by web, consumed by bot).
+  - Reserved for later: `verify_email`, `reset_password`.
 - `login_requests (id, poll_secret_hash, status 'pending'|'approved'|'rejected'|'claimed'|'expired', user_id, device_label, expires_at)`
 
 Backfill: one `telegram` identity row per existing user, `provider_user_id = users.id`, verified.
 
 ## Login flows
 
-1. **Email sign-up.** Email, password, display name. Account is created unverified; a 6-digit code is emailed. Login is refused until the code is entered. Code: hashed, 10 min, single use, 5 attempts.
+1. **Email sign-up.** Email, password, display name. The account is created and logged in immediately. No email is sent and the address is not verified, so at launch the email acts as a username. An already-registered email is rejected with an explicit "already registered" error.
 2. **Email login.** Email + password issues a session. Wrong email and wrong password return the same error. Rate-limited per email and per IP.
-3. **Forgot password.** Emailed single-use code, 30 minutes. Setting a new password revokes all sessions.
+3. **Forgot password: disabled at launch.** The login screen has no reset option. When email delivery is enabled later, this becomes an emailed single-use code (30 minutes) that revokes all sessions on use.
 4. **Continue with Telegram.**
    - **A (button):** the web app creates a `login_request` and receives `{requestId, pollSecret, botLink}`. The link opens the bot at `/start web_<requestId>`. The bot shows the device label with Approve/Reject buttons. On approval the web app, holding the `pollSecret`, claims the session. The link alone is not enough to claim it.
    - **C (code):** the user sends `/web` to the bot, which replies with a 6-digit `web_login` code. The user types it into the web app, which exchanges it for a session.
@@ -58,7 +62,7 @@ Backfill: one `telegram` identity row per existing user, `provider_user_id = use
 - Web app session: `httpOnly`, `Secure`, `SameSite=Lax` cookie holding a 15-minute access token, plus a 30-day rotating refresh token whose hash is stored in `sessions`. "Log out of all devices" revokes every row for the account.
 - Mini App keeps its in-memory bearer token. The API accepts either credential.
 - Passwords hashed with Node's built-in `scrypt`. Minimum 8 characters, never logged, small common-password blocklist.
-- Rate limits: login attempts per email and per IP; verification and reset emails per address; 5 tries per code.
+- Rate limits: sign-up and login attempts per email and per IP; 5 tries per one-time code.
 - CORS restricted to the web app's own origin (currently open to all origins).
 - Installed iPhone apps have their own cookie jar, so login must happen inside the installed app. The landing page must therefore place "add to home screen" before login. Designed separately.
 
@@ -71,26 +75,30 @@ Backfill: one `telegram` identity row per existing user, `provider_user_id = use
 
 ## API and bot surface
 
-- API: `POST /api/auth/email/signup`, `.../verify-email`, `.../login`, `.../forgot`, `.../reset`, `POST /api/auth/logout`, `POST /api/auth/refresh`, `GET /api/auth/me`, `POST /api/auth/telegram/request`, `GET /api/auth/telegram/poll`, `POST /api/auth/code`, `POST /api/auth/link/telegram`, `POST /api/auth/link/email`.
+- API at launch: `POST /api/auth/email/signup`, `POST /api/auth/email/login`, `POST /api/auth/logout`, `POST /api/auth/refresh`, `GET /api/auth/me`, `POST /api/auth/telegram/request`, `GET /api/auth/telegram/poll`, `POST /api/auth/code`, `POST /api/auth/link/telegram`, `POST /api/auth/link/email`, `POST /api/auth/password` (set or change the password while logged in). Deferred: verify-email, forgot, reset.
 - Bot: `/start web_<requestId>` (approve), `/web` (issue code), `/link <code>`.
 
 ## Error handling
 
 - Expired, used, or wrong codes return a single generic "invalid or expired" error.
 - Login failure messages never reveal whether an email exists.
-- Sign-up with an email already in use returns the same response as a fresh sign-up and sends a "you already have an account" email instead.
+- Sign-up with an email already in use returns an explicit "already registered" error. This reveals that an email exists, an accepted trade-off while no email can be sent.
 - Linking refusal is explicit and non-destructive.
 
 ## Testing
 
-Scripted flows on the server with disposable accounts, as used for the daily limits: full sign-up, verify, login, reset; both Telegram handshakes; linking in all four data combinations; plus abuse cases (expired and replayed codes, wrong poll secret, rate-limit trips, concurrent link attempts, existing Telegram users unaffected after backfill).
+Scripted flows on the server with disposable accounts, as used for the daily limits: sign-up, login, duplicate-email rejection; both Telegram handshakes; linking in all four data combinations; plus abuse cases (expired and replayed codes, wrong poll secret, rate-limit trips, concurrent link attempts, existing Telegram users unaffected after backfill).
+
+## Interim account recovery
+
+With no email delivery, a forgotten password cannot be reset by the user. Two fallbacks exist until email is enabled: an account with a linked Telegram identity can always log in through the Telegram handshake and set a new password in Settings; otherwise the admin resets the password hash manually with a script. Users should be told at sign-up that there is no password reset yet.
 
 ## Out of scope
 
-Landing page and install prompt; natural-language quick entry on the web; passkeys, phone, and Google sign-in; account deletion and data export; account merging.
+Landing page and install prompt; natural-language quick entry on the web; legal pages (terms, privacy policy); email sending, verification and password reset; passkeys, phone, and Google sign-in; account deletion and data export; account merging.
 
-## Open dependencies
+## Deferred dependencies
 
-- SES setup and DNS records (owner action).
-- Terms of service and privacy policy, since the app will now hold emails and passwords.
-- Decision on whether web-only users get a natural-language quick-entry box, since they will not have the bot.
+- Amazon SES setup and SPF/DKIM DNS records (owner action), required before email verification and password reset can be enabled.
+- Terms of service and privacy policy, recommended before opening sign-up to the public since emails and passwords are now stored.
+- Whether web-only users get a natural-language quick-entry box, since they will not have the bot.
