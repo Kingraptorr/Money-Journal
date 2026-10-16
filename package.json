@@ -8,6 +8,7 @@
     "bot": "node bot/index.js",
     "build": "vite build --config miniapp/vite.config.js",
     "miniapp": "vite --host 0.0.0.0 --config miniapp/vite.config.js",
+    "reset-password": "node scripts/reset-password.js",
     "dev:api": "nodemon api/index.js",
     "dev:bot": "nodemon bot/index.js",
     "build:miniapp": "vite build --config miniapp/vite.config.js",
