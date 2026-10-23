@@ -1,6 +1,7 @@
 import { InlineKeyboard } from "grammy";
 import { query } from "../../db/index.js";
 import { extractExpense } from "../services/gemini.js";
+import { applyLearnedCategory } from "../services/learnedCategory.js";
 import { clearUserState, getUserState, setUserState } from "../services/state.js";
 import { buildConfirmationText, buildDeleteConfirmationText } from "../utils/format.js";
 import { CATEGORY_LABELS_FA } from "../utils/categories.js";
@@ -146,6 +147,7 @@ export async function replyIfOverDailyLimit(ctx) {
 }
 
 async function sendPendingConfirmation(ctx, pendingExpense) {
+  pendingExpense = await applyLearnedCategory(ctx.account.id, pendingExpense);
   setUserState(ctx.from.id, "awaiting_confirmation", { expense: pendingExpense });
   await ctx.reply(buildConfirmationText(pendingExpense), {
     reply_markup: new InlineKeyboard()
