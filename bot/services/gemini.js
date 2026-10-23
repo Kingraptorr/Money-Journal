@@ -446,13 +446,24 @@ function categorizeByKeywords(value) {
   return rules.find((rule) => rule.pattern.test(text))?.category ?? "other";
 }
 
-function normalizeTomanShorthandAmount(amount, originalMessage) {
-  if (!amount || amount >= 10_000) return amount;
-  const normalized = normalizeDigits(originalMessage).replace(/[,٬]/g, "");
-  const amountPattern = String(Math.trunc(amount)).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const amountWithToman = new RegExp(`(^|\\D)${amountPattern}(?:\\.0+)?\\s*(تومن|تومان)(\\D|$)`);
+// Words that state the scale or the currency themselves, so a bare number is not shorthand.
+const EXPLICIT_SCALE_OR_FOREIGN_PATTERN = /(هزار|میلیون|ملیون|میلیارد|ریال|دلار|یورو|پوند|لیر|\b(?:usd|eur|gbp|try|k)\b|[$€£])/i;
 
-  return amountWithToman.test(normalized) ? amount * 1_000 : amount;
+// House convention: a bare 3-4 digit toman amount means thousands ("ناهار ۵۱۷۴" = 5,174,000).
+// Gemini is told this too, but it is not consistent, so the rule is enforced here.
+export function normalizeTomanShorthandAmount(amount, originalMessage, currency = "IRT") {
+  const value = Number(amount);
+  if (!value || !Number.isInteger(value) || value >= 10_000) return amount;
+  if (currency && currency !== "IRT") return amount;
+
+  const text = removeJalaliDateFragments(originalMessage).replace(/[,٬]/g, "");
+  const digits = String(value);
+  const standalone = new RegExp(`(^|\\D)${digits}(?:\\.0+)?(?=\\D|$)`);
+  if (!standalone.test(text)) return amount;
+
+  if (new RegExp(`(^|\\D)${digits}(?:\\.0+)?\\s*(تومن|تومان)(\\D|$)`).test(text)) return value * 1_000;
+  if (EXPLICIT_SCALE_OR_FOREIGN_PATTERN.test(text)) return amount;
+  return digits.length >= 3 ? value * 1_000 : amount;
 }
 
 function extractFallbackAmount(message) {
@@ -469,6 +480,7 @@ function extractFallbackAmount(message) {
     else if (/هزار/.test(beforeAndAfter)) amount *= 1_000;
     else if (/(تومن|تومان)/.test(afterNumber) && amount < 10_000) amount *= 1_000;
     else if (hasIranianCurrency && amount < 10_000) amount *= 1_000;
+    else amount = normalizeTomanShorthandAmount(amount, message);
 
     return amount;
   }
@@ -537,7 +549,7 @@ function normalizeExtraction(extraction, originalMessage) {
   if (extraction?.action === "log" && extraction.amount && !extraction.category) {
     return {
       ...extraction,
-      amount: normalizeTomanShorthandAmount(extraction.amount, originalMessage),
+      amount: normalizeTomanShorthandAmount(extraction.amount, originalMessage, extraction.currency),
       category: finalCategory,
       merchant: cleanedMerchant || null,
       note: originalExpenseName || cleanedNote || extraction.note,
@@ -548,7 +560,7 @@ function normalizeExtraction(extraction, originalMessage) {
   if (extraction?.action === "log" && extraction.amount != null) {
     return {
       ...extraction,
-      amount: normalizeTomanShorthandAmount(extraction.amount, originalMessage),
+      amount: normalizeTomanShorthandAmount(extraction.amount, originalMessage, extraction.currency),
       category: finalCategory,
       merchant: cleanedMerchant || extraction.merchant,
       note: originalExpenseName || cleanedNote || extraction.note,
